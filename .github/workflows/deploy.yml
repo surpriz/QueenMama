@@ -1,0 +1,51 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Build Docker images
+        run: |
+          docker build -f docker/api.Dockerfile -t queen-mama-api:latest --target production .
+          docker build -f docker/web.Dockerfile -t queen-mama-web:latest --target production .
+
+      - name: Save Docker images
+        run: |
+          docker save queen-mama-api:latest | gzip > api.tar.gz
+          docker save queen-mama-web:latest | gzip > web.tar.gz
+
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "api.tar.gz,web.tar.gz,docker-compose.prod.yml"
+          target: "/opt/queen-mama"
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/queen-mama
+            docker load < api.tar.gz
+            docker load < web.tar.gz
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml up -d
+            docker system prune -af

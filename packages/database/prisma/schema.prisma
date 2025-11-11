@@ -1,0 +1,300 @@
+// packages/database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= USERS & ORGANIZATIONS =============
+
+model Customer {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique // Clerk user ID
+  email     String   @unique
+  firstName String?
+  lastName  String?
+  company   String?
+  role      String?
+
+  // Subscription
+  plan            Plan     @default(PAY_PER_LEAD)
+  stripeCustomerId String?  @unique
+  subscriptionId   String?
+  subscriptionStatus SubscriptionStatus @default(INACTIVE)
+
+  // Billing
+  credits         Int      @default(0)
+  creditsUsed     Int      @default(0)
+
+  campaigns       Campaign[]
+  payments        Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+enum Plan {
+  PAY_PER_LEAD      // 0€/mo + 60€/lead
+  STARTER           // 99€/mo + 30€/lead
+  GROWTH            // 299€/mo + 25€/lead
+  SCALE             // 999€/mo + 20€/lead
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+// ============= CAMPAIGNS =============
+
+model Campaign {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      CampaignStatus @default(DRAFT)
+
+  // ICP (Ideal Customer Profile)
+  targetCriteria Json // { industries: [], companySize: [], locations: [], titles: [] }
+
+  // Budget & Pricing
+  budget          Float
+  pricePerLead    Float // Dynamic based on plan
+  maxLeads        Int?  // Optional cap
+
+  // Email Sequence
+  emailSequences  EmailSequence[]
+
+  // Stats
+  totalContacted  Int @default(0)
+  totalReplies    Int @default(0)
+  totalQualified  Int @default(0)
+  totalPaid       Int @default(0)
+
+  leads           Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  startedAt DateTime?
+  completedAt DateTime?
+
+  @@index([customerId])
+  @@index([status])
+}
+
+enum CampaignStatus {
+  DRAFT          // Being configured
+  PENDING_REVIEW // Waiting for admin approval
+  WARMUP         // Domain warming phase
+  ACTIVE         // Currently running
+  PAUSED         // Temporarily stopped
+  COMPLETED      // Finished
+  CANCELED       // Canceled by user
+}
+
+model EmailSequence {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  step        Int      // 1, 2, 3...
+  subject     String
+  body        String   @db.Text
+  delayDays   Int      // Days after previous email
+
+  // Stats
+  sent        Int @default(0)
+  opened      Int @default(0)
+  clicked     Int @default(0)
+  replied     Int @default(0)
+
+  @@index([campaignId])
+}
+
+// ============= LEADS =============
+
+model Lead {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId  String   // For quick access
+
+  // Contact Info (encrypted in production)
+  firstName   String
+  lastName    String
+  email       String
+  company     String
+  title       String
+  linkedinUrl String?
+  phone       String?
+
+  // Enrichment data
+  companySize     String?
+  companyIndustry String?
+  location        String?
+
+  // Status & Qualification
+  status          LeadStatus @default(CONTACTED)
+  qualityScore    Int?       // 0-100 (AI-generated)
+  sentiment       Sentiment? // POSITIVE, NEUTRAL, NEGATIVE
+
+  // Interactions
+  interactions    Interaction[]
+
+  // Payment
+  isRevealed      Boolean @default(false)
+  revealedAt      DateTime?
+  paidAmount      Float?
+  paymentId       String?
+  payment         Payment? @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([email])
+}
+
+enum LeadStatus {
+  CONTACTED      // Email sent
+  OPENED         // Email opened
+  REPLIED        // Replied to email
+  INTERESTED     // Positive reply (AI-detected)
+  QUALIFIED      // Manually qualified, ready to unlock
+  PAID           // Customer paid to reveal contact
+  NOT_INTERESTED // Negative reply
+  BOUNCED        // Email bounced
+  UNSUBSCRIBED   // Unsubscribed
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+model Interaction {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  type        InteractionType
+  content     String?  @db.Text // Email content, encrypted
+  metadata    Json?    // { opened: true, clicked: true, links: [] }
+
+  createdAt   DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+enum InteractionType {
+  EMAIL_SENT
+  EMAIL_OPENED
+  EMAIL_CLICKED
+  EMAIL_REPLIED
+  EMAIL_BOUNCED
+  LINKEDIN_VISITED
+  PHONE_CALLED
+}
+
+// ============= PAYMENTS =============
+
+model Payment {
+  id              String   @id @default(cuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  type            PaymentType
+  amount          Float
+  currency        String @default("EUR")
+
+  // Stripe
+  stripePaymentIntentId String? @unique
+  stripeInvoiceId       String?
+
+  status          PaymentStatus @default(PENDING)
+
+  // Related entities
+  leads           Lead[]
+  metadata        Json? // { leadIds: [], campaignId: "" }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+}
+
+enum PaymentType {
+  SUBSCRIPTION  // Monthly subscription
+  LEAD_UNLOCK   // One-time lead unlock
+  CREDITS       // Bulk credits purchase
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+// ============= JOBS & SYSTEM =============
+
+model Job {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "send-email-sequence"
+  data        Json     // Job payload
+  status      JobStatus @default(PENDING)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  error       String?  @db.Text
+
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String   // Clerk ID
+  action    String   // e.g., "campaign.created"
+  entity    String   // e.g., "Campaign"
+  entityId  String
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
