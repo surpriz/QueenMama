@@ -13,8 +13,9 @@ datasource db {
 
 model Customer {
   id        String   @id @default(cuid())
-  clerkId   String   @unique // Clerk user ID
+  clerkId   String?  @unique // Optional - for future Clerk migration
   email     String   @unique
+  password  String   // Hashed password for custom auth
   firstName String?
   lastName  String?
   company   String?
@@ -36,7 +37,6 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([clerkId])
   @@index([email])
 }
 
