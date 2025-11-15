@@ -1,3 +1,6 @@
+'use client';
+
+import Link from 'next/link';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,73 +14,28 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Plus } from 'lucide-react';
-
-// Données de démo
-const campaigns = [
-  {
-    id: 1,
-    name: 'SaaS Startup Outreach',
-    status: 'Active',
-    totalContacted: 145,
-    totalReplies: 32,
-    totalQualified: 23,
-    budget: 2500,
-    pricePerLead: 30,
-  },
-  {
-    id: 2,
-    name: 'E-commerce CEOs',
-    status: 'Active',
-    totalContacted: 98,
-    totalReplies: 19,
-    totalQualified: 18,
-    budget: 1800,
-    pricePerLead: 25,
-  },
-  {
-    id: 3,
-    name: 'Marketing Agencies',
-    status: 'Paused',
-    totalContacted: 67,
-    totalReplies: 11,
-    totalQualified: 8,
-    budget: 1200,
-    pricePerLead: 30,
-  },
-  {
-    id: 4,
-    name: 'Tech Consultants',
-    status: 'Draft',
-    totalContacted: 0,
-    totalReplies: 0,
-    totalQualified: 0,
-    budget: 3000,
-    pricePerLead: 35,
-  },
-  {
-    id: 5,
-    name: 'Real Estate Professionals',
-    status: 'Completed',
-    totalContacted: 250,
-    totalReplies: 48,
-    totalQualified: 36,
-    budget: 5000,
-    pricePerLead: 40,
-  },
-];
+import { useCampaigns } from '@/hooks/use-campaigns';
 
 const getStatusBadge = (status: string) => {
   const variants: Record<string, { variant: any; className: string }> = {
-    Active: { variant: 'default', className: 'bg-green-100 text-green-700 hover:bg-green-200' },
-    Paused: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
-    Draft: { variant: 'outline', className: '' },
-    Completed: { variant: 'secondary', className: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+    ACTIVE: { variant: 'default', className: 'bg-green-100 text-green-700 hover:bg-green-200' },
+    PAUSED: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+    DRAFT: { variant: 'outline', className: '' },
+    COMPLETED: { variant: 'secondary', className: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+    PENDING_REVIEW: { variant: 'secondary', className: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+    WARMUP: { variant: 'secondary', className: 'bg-orange-100 text-orange-700 hover:bg-orange-200' },
+    CANCELED: { variant: 'destructive', className: '' },
   };
 
-  return variants[status] || variants.Draft;
+  return variants[status] || variants.DRAFT;
+};
+
+const formatStatus = (status: string) => {
+  return status.charAt(0) + status.slice(1).toLowerCase().replace('_', ' ');
 };
 
 export default function CampaignsPage() {
+  const { data: campaigns, isLoading, error } = useCampaigns();
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -88,10 +46,12 @@ export default function CampaignsPage() {
               Manage your lead generation campaigns
             </p>
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Campaign
-          </Button>
+          <Link href="/campaigns/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Campaign
+            </Button>
+          </Link>
         </div>
 
         <Card>
@@ -99,41 +59,66 @@ export default function CampaignsPage() {
             <CardTitle>All Campaigns</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Contacted</TableHead>
-                  <TableHead className="text-right">Replies</TableHead>
-                  <TableHead className="text-right">Qualified</TableHead>
-                  <TableHead className="text-right">Budget</TableHead>
-                  <TableHead className="text-right">Price/Lead</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((campaign) => {
-                  const badge = getStatusBadge(campaign.status);
-                  return (
-                    <TableRow key={campaign.id}>
-                      <TableCell className="font-medium">{campaign.name}</TableCell>
-                      <TableCell>
-                        <Badge variant={badge.variant} className={badge.className}>
-                          {campaign.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{campaign.totalContacted}</TableCell>
-                      <TableCell className="text-right">{campaign.totalReplies}</TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">
-                        {campaign.totalQualified}
-                      </TableCell>
-                      <TableCell className="text-right">€{campaign.budget}</TableCell>
-                      <TableCell className="text-right">€{campaign.pricePerLead}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <p className="text-red-500">Failed to load campaigns</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {error instanceof Error ? error.message : 'Unknown error'}
+                </p>
+              </div>
+            ) : !campaigns || campaigns.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">
+                  No campaigns yet. Create your first campaign to get started!
+                </p>
+                <Link href="/campaigns/new">
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Campaign
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Contacted</TableHead>
+                    <TableHead className="text-right">Replies</TableHead>
+                    <TableHead className="text-right">Qualified</TableHead>
+                    <TableHead className="text-right">Budget</TableHead>
+                    <TableHead className="text-right">Price/Lead</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {campaigns.map((campaign) => {
+                    const badge = getStatusBadge(campaign.status);
+                    return (
+                      <TableRow key={campaign.id}>
+                        <TableCell className="font-medium">{campaign.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={badge.variant} className={badge.className}>
+                            {formatStatus(campaign.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{campaign.totalContacted}</TableCell>
+                        <TableCell className="text-right">{campaign.totalReplies}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">
+                          {campaign.totalQualified}
+                        </TableCell>
+                        <TableCell className="text-right">€{campaign.budget}</TableCell>
+                        <TableCell className="text-right">€{campaign.pricePerLead}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

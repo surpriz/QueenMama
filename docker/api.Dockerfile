@@ -38,5 +38,5 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 
-EXPOSE 3001
+EXPOSE 3003
 CMD ["node", "dist/main.js"]
