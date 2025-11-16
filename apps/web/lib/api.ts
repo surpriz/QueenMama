@@ -194,3 +194,53 @@ export const campaignsApi = {
   getStats: (id: string) =>
     api.get<CampaignStats>(`/campaigns/${id}/stats`).then((res) => res.data),
 };
+
+// Admin
+export interface AdminStats {
+  totalUsers: number;
+  activeUsers: number;
+  blockedUsers: number;
+  admins: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  company?: string;
+  role: 'USER' | 'ADMIN';
+  status: 'ACTIVE' | 'BLOCKED' | 'DELETED';
+  isVerified: boolean;
+  plan: string;
+  createdAt: string;
+  updatedAt: string;
+  _count: {
+    campaigns: number;
+    payments: number;
+  };
+}
+
+export const adminApi = {
+  getStats: () => api.get<AdminStats>('/admin/stats').then((res) => res.data),
+
+  getAllUsers: () => api.get<AdminUser[]>('/admin/users').then((res) => res.data),
+
+  getUser: (id: string) =>
+    api.get<AdminUser>(`/admin/users/${id}`).then((res) => res.data),
+
+  blockUser: (id: string) =>
+    api.patch<{ message: string; user: AdminUser }>(`/admin/users/${id}/block`).then((res) => res.data),
+
+  unblockUser: (id: string) =>
+    api.patch<{ message: string; user: AdminUser }>(`/admin/users/${id}/unblock`).then((res) => res.data),
+
+  demoteUser: (id: string) =>
+    api.patch<{ message: string; user: AdminUser }>(`/admin/users/${id}/demote`).then((res) => res.data),
+
+  promoteUser: (id: string) =>
+    api.patch<{ message: string; user: AdminUser }>(`/admin/users/${id}/promote`).then((res) => res.data),
+
+  deleteUser: (id: string) =>
+    api.delete<{ message: string }>(`/admin/users/${id}`).then((res) => res.data),
+};

@@ -5,6 +5,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { PrismaModule } from './common/services/prisma.module';
 
 @Module({
   imports: [
@@ -18,8 +20,10 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
         limit: 10,
       },
     ]),
+    PrismaModule,
     AuthModule,
     CampaignsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

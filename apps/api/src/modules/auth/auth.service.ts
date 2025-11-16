@@ -50,6 +50,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         company: user.company,
+        role: user.role,
+        isVerified: user.isVerified,
       },
     };
   }
@@ -85,6 +87,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         company: user.company,
+        role: user.role,
+        isVerified: user.isVerified,
       },
     };
   }
@@ -105,6 +109,8 @@ export class AuthService {
       lastName: user.lastName,
       company: user.company,
       plan: user.plan,
+      role: user.role,
+      isVerified: user.isVerified,
     };
   }
 }

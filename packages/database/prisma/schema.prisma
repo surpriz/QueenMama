@@ -11,6 +11,17 @@ datasource db {
 
 // ============= USERS & ORGANIZATIONS =============
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
 model Customer {
   id        String   @id @default(cuid())
   clerkId   String?  @unique // Optional - for future Clerk migration
@@ -19,7 +30,11 @@ model Customer {
   firstName String?
   lastName  String?
   company   String?
-  role      String?
+
+  // Account management
+  role          UserRole        @default(USER)
+  status        AccountStatus   @default(ACTIVE)
+  isVerified    Boolean         @default(false)
 
   // Subscription
   plan            Plan     @default(PAY_PER_LEAD)
@@ -38,6 +53,8 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   @@index([email])
+  @@index([role])
+  @@index([status])
 }
 
 enum Plan {

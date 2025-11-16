@@ -10,6 +10,8 @@ interface User {
   lastName?: string;
   company?: string;
   plan?: string;
+  role?: 'USER' | 'ADMIN';
+  isVerified?: boolean;
 }
 
 interface AuthContextType {
