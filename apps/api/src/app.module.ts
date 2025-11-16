@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { LeadsModule } from './modules/leads/leads.module';
 import { PrismaModule } from './common/services/prisma.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { PrismaModule } from './common/services/prisma.module';
     AuthModule,
     CampaignsModule,
     AdminModule,
+    LeadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

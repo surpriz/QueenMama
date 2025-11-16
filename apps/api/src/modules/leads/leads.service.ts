@@ -1,0 +1,209 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import { Plan } from '@prisma/client';
+import { PrismaService } from '../../common/services/prisma.service';
+
+// Price per lead based on plan
+const PRICE_PER_LEAD_MAP = {
+  [Plan.PAY_PER_LEAD]: 60,
+  [Plan.STARTER]: 30,
+  [Plan.GROWTH]: 25,
+  [Plan.SCALE]: 20,
+};
+
+@Injectable()
+export class LeadsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Get all leads for a customer
+   */
+  async getAllLeads(customerId: string) {
+    const leads = await this.prisma.lead.findMany({
+      where: { customerId },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        interactions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1, // Get latest interaction
+        },
+      },
+      orderBy: [
+        { status: 'asc' },
+        { qualityScore: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    });
+
+    // Mask email for non-revealed leads
+    return leads.map((lead) => ({
+      ...lead,
+      email: lead.isRevealed ? lead.email : this.maskEmail(lead.email),
+      phone: lead.isRevealed ? lead.phone : null,
+      linkedinUrl: lead.isRevealed ? lead.linkedinUrl : null,
+    }));
+  }
+
+  /**
+   * Get single lead by ID (with ownership check)
+   */
+  async getLeadById(id: string, customerId: string) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            pricePerLead: true,
+          },
+        },
+        interactions: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    // Verify ownership
+    if (lead.customerId !== customerId) {
+      throw new ForbiddenException('You do not have access to this lead');
+    }
+
+    // Mask contact info if not revealed
+    if (!lead.isRevealed) {
+      lead.email = this.maskEmail(lead.email);
+      lead.phone = null;
+      lead.linkedinUrl = null;
+    }
+
+    return lead;
+  }
+
+  /**
+   * Unlock lead (payment + reveal)
+   */
+  async unlockLead(id: string, customerId: string) {
+    // Get lead with campaign info
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+            pricePerLead: true,
+            customerId: true,
+          },
+        },
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    // Verify ownership
+    if (lead.customerId !== customerId) {
+      throw new ForbiddenException('You do not have access to this lead');
+    }
+
+    // Check if already revealed
+    if (lead.isRevealed) {
+      throw new BadRequestException('Lead is already unlocked');
+    }
+
+    // Check if lead is qualified
+    if (lead.status !== 'QUALIFIED' && lead.status !== 'INTERESTED') {
+      throw new BadRequestException(
+        'Only qualified or interested leads can be unlocked',
+      );
+    }
+
+    const unlockPrice = lead.campaign.pricePerLead;
+
+    // For MVP: Simplified payment (no Stripe)
+    // In production: Create Stripe payment intent here
+
+    // Update lead and campaign in transaction
+    const updatedLead = await this.prisma.$transaction(async (tx) => {
+      // Reveal lead
+      const revealedLead = await tx.lead.update({
+        where: { id },
+        data: {
+          isRevealed: true,
+          revealedAt: new Date(),
+          paidAmount: unlockPrice,
+          status: 'PAID',
+        },
+        include: {
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          interactions: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+
+      // Update campaign totalPaid counter
+      await tx.campaign.update({
+        where: { id: lead.campaignId },
+        data: {
+          totalPaid: { increment: 1 },
+        },
+      });
+
+      // Create payment record (simplified for MVP)
+      await tx.payment.create({
+        data: {
+          customerId,
+          type: 'LEAD_UNLOCK',
+          amount: unlockPrice,
+          currency: 'EUR',
+          status: 'SUCCEEDED',
+          metadata: {
+            leadId: id,
+            campaignId: lead.campaignId,
+          },
+        },
+      });
+
+      return revealedLead;
+    });
+
+    return {
+      message: 'Lead unlocked successfully',
+      lead: updatedLead,
+      amountPaid: unlockPrice,
+    };
+  }
+
+  /**
+   * Mask email address (e.g., john@example.com -> j***@example.com)
+   */
+  private maskEmail(email: string): string {
+    const [localPart, domain] = email.split('@');
+    if (!localPart || !domain) return email;
+
+    const maskedLocal = localPart.charAt(0) + '***';
+    return `${maskedLocal}@${domain}`;
+  }
+}

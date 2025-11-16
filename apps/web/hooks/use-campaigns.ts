@@ -40,6 +40,14 @@ export function useCampaignStats(id: string) {
   });
 }
 
+// Get dashboard stats
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => campaignsApi.getDashboardStats(),
+  });
+}
+
 // Create campaign
 export function useCreateCampaign() {
   const queryClient = useQueryClient();

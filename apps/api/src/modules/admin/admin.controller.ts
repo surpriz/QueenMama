@@ -1,21 +1,32 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
+  Body,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from './guards/admin.guard';
+import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
+import { CreateLeadDto } from '../leads/dto/create-lead.dto';
+import { UpdateLeadDto } from '../leads/dto/update-lead.dto';
+import { InteractionType } from '@prisma/client';
 
+@ApiTags('admin')
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@ApiBearerAuth()
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('stats')
+  @ApiOperation({ summary: 'Get admin statistics' })
+  @ApiResponse({ status: 200, description: 'Admin statistics' })
   async getStats() {
     return this.adminService.getStats();
   }
@@ -53,5 +64,109 @@ export class AdminController {
   @Delete('users/:id')
   async deleteUser(@Param('id') id: string) {
     return this.adminService.deleteUser(id);
+  }
+
+  // ============= CAMPAIGN MANAGEMENT =============
+
+  @Get('campaigns')
+  @ApiOperation({ summary: 'Get all campaigns (admin)' })
+  @ApiResponse({ status: 200, description: 'List of all campaigns' })
+  async getAllCampaigns() {
+    return this.adminService.getAllCampaigns();
+  }
+
+  @Get('campaigns/:id')
+  @ApiOperation({ summary: 'Get campaign details (admin)' })
+  @ApiResponse({ status: 200, description: 'Campaign details' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async getCampaign(@Param('id') id: string) {
+    return this.adminService.getCampaign(id);
+  }
+
+  @Patch('campaigns/:id')
+  @ApiOperation({ summary: 'Update campaign (admin)' })
+  @ApiResponse({ status: 200, description: 'Campaign updated successfully' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async updateCampaign(
+    @Param('id') id: string,
+    @Body() updateCampaignDto: UpdateCampaignDto,
+  ) {
+    return this.adminService.updateCampaign(id, updateCampaignDto);
+  }
+
+  @Patch('campaigns/:id/approve')
+  @ApiOperation({ summary: 'Approve campaign (PENDING_REVIEW → ACTIVE)' })
+  @ApiResponse({ status: 200, description: 'Campaign approved successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid campaign status' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async approveCampaign(@Param('id') id: string) {
+    return this.adminService.approveCampaign(id);
+  }
+
+  @Patch('campaigns/:id/reject')
+  @ApiOperation({ summary: 'Reject campaign (PENDING_REVIEW → DRAFT)' })
+  @ApiResponse({ status: 200, description: 'Campaign rejected successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid campaign status' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async rejectCampaign(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.adminService.rejectCampaign(id, body.reason);
+  }
+
+  // ============= LEAD MANAGEMENT =============
+
+  @Post('leads')
+  @ApiOperation({ summary: 'Create lead manually (admin)' })
+  @ApiResponse({ status: 201, description: 'Lead created successfully' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async createLead(@Body() createLeadDto: CreateLeadDto) {
+    return this.adminService.createLead(createLeadDto);
+  }
+
+  @Get('leads')
+  @ApiOperation({ summary: 'Get all leads (admin)' })
+  @ApiResponse({ status: 200, description: 'List of all leads' })
+  async getAllLeads() {
+    return this.adminService.getAllLeads();
+  }
+
+  @Get('leads/:id')
+  @ApiOperation({ summary: 'Get lead details (admin)' })
+  @ApiResponse({ status: 200, description: 'Lead details' })
+  @ApiResponse({ status: 404, description: 'Lead not found' })
+  async getLead(@Param('id') id: string) {
+    return this.adminService.getLead(id);
+  }
+
+  @Patch('leads/:id')
+  @ApiOperation({ summary: 'Update lead (admin)' })
+  @ApiResponse({ status: 200, description: 'Lead updated successfully' })
+  @ApiResponse({ status: 404, description: 'Lead not found' })
+  async updateLead(
+    @Param('id') id: string,
+    @Body() updateLeadDto: UpdateLeadDto,
+  ) {
+    return this.adminService.updateLead(id, updateLeadDto);
+  }
+
+  @Delete('leads/:id')
+  @ApiOperation({ summary: 'Delete lead (admin)' })
+  @ApiResponse({ status: 200, description: 'Lead deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Lead not found' })
+  async deleteLead(@Param('id') id: string) {
+    return this.adminService.deleteLead(id);
+  }
+
+  @Post('leads/:id/interactions')
+  @ApiOperation({ summary: 'Add interaction to lead (admin)' })
+  @ApiResponse({ status: 201, description: 'Interaction added successfully' })
+  @ApiResponse({ status: 404, description: 'Lead not found' })
+  async addInteraction(
+    @Param('id') id: string,
+    @Body() body: { type: InteractionType; content?: string },
+  ) {
+    return this.adminService.addInteraction(id, body.type, body.content);
   }
 }

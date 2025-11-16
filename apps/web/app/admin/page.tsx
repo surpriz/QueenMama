@@ -12,8 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Users, UserCheck, Ban, Shield } from 'lucide-react';
-import { useAdminStats, useAdminUsers, useBlockUser, useUnblockUser, useDemoteUser, useDeleteUser } from '@/hooks/use-admin';
+import { Users, UserCheck, Ban, Shield, Target } from 'lucide-react';
+import { useAdminStats, useAdminUsers, useAdminCampaigns, useBlockUser, useUnblockUser, useDemoteUser, useDeleteUser } from '@/hooks/use-admin';
 import { AdminUser } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -36,11 +36,25 @@ const getRoleBadge = (role: string) => {
   return variants[role] || variants.USER;
 };
 
+const getCampaignStatusBadge = (status: string) => {
+  const variants: Record<string, { className: string }> = {
+    DRAFT: { className: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+    PENDING_REVIEW: { className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+    WARMUP: { className: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+    ACTIVE: { className: 'bg-green-100 text-green-700 hover:bg-green-200' },
+    PAUSED: { className: 'bg-orange-100 text-orange-700 hover:bg-orange-200' },
+    COMPLETED: { className: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
+    CANCELED: { className: 'bg-red-100 text-red-700 hover:bg-red-200' },
+  };
+  return variants[status] || variants.DRAFT;
+};
+
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users, isLoading: usersLoading } = useAdminUsers();
+  const { data: campaigns } = useAdminCampaigns();
   const blockUser = useBlockUser();
   const unblockUser = useUnblockUser();
   const demoteUser = useDemoteUser();
@@ -90,7 +104,7 @@ export default function AdminPage() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -138,7 +152,95 @@ export default function AdminPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card
+            className="cursor-pointer hover:bg-accent transition-colors"
+            onClick={() => router.push('/admin/campaigns')}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Campaigns</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {campaigns?.length || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {campaigns?.filter((c) => c.status === 'PENDING_REVIEW').length || 0} pending review
+              </p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Recent Campaigns Widget */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Campaigns</CardTitle>
+            <p className="text-sm text-muted-foreground">Latest campaigns across all customers</p>
+          </CardHeader>
+          <CardContent>
+            {!campaigns || campaigns.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No campaigns found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {campaigns.slice(0, 5).map((campaign) => {
+                  const statusBadge = getCampaignStatusBadge(campaign.status);
+                  const customerName =
+                    campaign.customer.firstName && campaign.customer.lastName
+                      ? `${campaign.customer.firstName} ${campaign.customer.lastName}`
+                      : campaign.customer.email;
+
+                  return (
+                    <div
+                      key={campaign.id}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/admin/campaigns/${campaign.id}`)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <p className="font-medium">{campaign.name}</p>
+                            <p className="text-sm text-muted-foreground">{customerName}</p>
+                          </div>
+                          <Badge className={statusBadge.className}>
+                            {campaign.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 ml-4">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{campaign._count.leads} leads</p>
+                          <p className="text-xs text-green-600">{campaign.totalQualified} qualified</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/admin/campaigns/${campaign.id}`);
+                          }}
+                        >
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {campaigns.length > 5 && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => router.push('/admin/campaigns')}
+                  >
+                    View All Campaigns ({campaigns.length})
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Users Table */}
         <Card>

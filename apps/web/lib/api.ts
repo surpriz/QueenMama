@@ -173,6 +173,24 @@ export interface CampaignStats {
   remaining: number;
 }
 
+export interface DashboardStats {
+  totalCampaigns: number;
+  totalCampaignsGrowth: string;
+  activeLeads: number;
+  activeLeadsGrowth: string;
+  qualifiedLeads: number;
+  qualifiedLeadsGrowth: string;
+  revenue: number;
+  revenueGrowth: string;
+  recentCampaigns: Array<{
+    id: string;
+    name: string;
+    status: string;
+    leads: number;
+    qualified: number;
+  }>;
+}
+
 // ========== API Functions ==========
 
 // Campaigns
@@ -193,6 +211,9 @@ export const campaignsApi = {
 
   getStats: (id: string) =>
     api.get<CampaignStats>(`/campaigns/${id}/stats`).then((res) => res.data),
+
+  getDashboardStats: () =>
+    api.get<DashboardStats>('/campaigns/dashboard-stats').then((res) => res.data),
 };
 
 // Admin
@@ -221,7 +242,44 @@ export interface AdminUser {
   };
 }
 
+export interface AdminCampaign {
+  id: string;
+  name: string;
+  description?: string;
+  status: CampaignStatus;
+  targetCriteria: {
+    industries?: string[];
+    companySize?: string[];
+    locations?: string[];
+    titles?: string[];
+    [key: string]: any;
+  };
+  budget: number;
+  pricePerLead: number;
+  maxLeads?: number;
+  totalContacted: number;
+  totalReplies: number;
+  totalQualified: number;
+  totalPaid: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  customer: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    company?: string;
+  };
+  _count: {
+    leads: number;
+    emailSequences: number;
+  };
+}
+
 export const adminApi = {
+  // User management
   getStats: () => api.get<AdminStats>('/admin/stats').then((res) => res.data),
 
   getAllUsers: () => api.get<AdminUser[]>('/admin/users').then((res) => res.data),
@@ -243,4 +301,67 @@ export const adminApi = {
 
   deleteUser: (id: string) =>
     api.delete<{ message: string }>(`/admin/users/${id}`).then((res) => res.data),
+
+  // Campaign management
+  getAllCampaigns: () =>
+    api.get<AdminCampaign[]>('/admin/campaigns').then((res) => res.data),
+
+  getCampaign: (id: string) =>
+    api.get<AdminCampaign>(`/admin/campaigns/${id}`).then((res) => res.data),
+
+  updateCampaign: (id: string, data: UpdateCampaignDto) =>
+    api.patch<{ message: string; campaign: AdminCampaign }>(`/admin/campaigns/${id}`, data).then((res) => res.data),
+
+  approveCampaign: (id: string) =>
+    api.patch<{ message: string; campaign: AdminCampaign }>(`/admin/campaigns/${id}/approve`).then((res) => res.data),
+
+  rejectCampaign: (id: string, reason?: string) =>
+    api.patch<{ message: string; campaign: AdminCampaign }>(`/admin/campaigns/${id}/reject`, { reason }).then((res) => res.data),
+
+  // Lead management
+  getAllLeads: () =>
+    api.get<Lead[]>('/admin/leads').then((res) => res.data),
+
+  getLead: (id: string) =>
+    api.get<Lead>(`/admin/leads/${id}`).then((res) => res.data),
+
+  createLead: (data: CreateLeadDto) =>
+    api.post<{ message: string; lead: Lead }>('/admin/leads', data).then((res) => res.data),
+
+  updateLead: (id: string, data: UpdateLeadDto) =>
+    api.patch<{ message: string; lead: Lead }>(`/admin/leads/${id}`, data).then((res) => res.data),
+
+  deleteLead: (id: string) =>
+    api.delete<{ message: string }>(`/admin/leads/${id}`).then((res) => res.data),
+};
+
+// Leads (customer)
+export interface CreateLeadDto {
+  campaignId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  company: string;
+  title: string;
+  linkedinUrl?: string;
+  phone?: string;
+  companySize?: string;
+  companyIndustry?: string;
+  location?: string;
+  status?: LeadStatus;
+  qualityScore?: number;
+  sentiment?: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+  responseContent?: string;
+}
+
+export interface UpdateLeadDto extends Partial<CreateLeadDto> {}
+
+export const leadsApi = {
+  getAll: () => api.get<Lead[]>('/leads').then((res) => res.data),
+
+  getOne: (id: string) =>
+    api.get<Lead>(`/leads/${id}`).then((res) => res.data),
+
+  unlock: (id: string) =>
+    api.post<{ message: string; lead: Lead; amountPaid: number }>(`/leads/${id}/unlock`).then((res) => res.data),
 };
