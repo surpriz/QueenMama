@@ -26,10 +26,16 @@ The complete infrastructure for Queen Mama MVP has been set up:
 - ✅ PostgreSQL configuration
 - ✅ Prisma Client generated
 
-### 5. Docker Configuration
+### 5. Docker Configuration (Optimized)
+- ✅ Multi-stage Dockerfiles with layer caching
+- ✅ Named volumes for node_modules (prevents stale Prisma binaries)
+- ✅ Configurable ports via environment variables
 - ✅ docker-compose.yml for local development
-- ✅ Dockerfiles for API and Web
-- ✅ PostgreSQL, Redis, MinIO services configured
+- ✅ docker-compose.prod.yml for production (Traefik + SSL)
+- ✅ Makefile with useful commands
+- ✅ Health check endpoints on API and Web
+- ✅ Multi-platform Prisma binaryTargets (arm64 + x64)
+- ✅ .dockerignore for optimized build context
 
 ### 6. CI/CD
 - ✅ GitHub Actions workflows for CI and deployment
@@ -48,17 +54,24 @@ The complete infrastructure for Queen Mama MVP has been set up:
 First, **start Docker Desktop** on your Mac, then run:
 
 ```bash
-docker-compose up -d postgres redis minio
+# Recommended: Start infrastructure only
+make dev
+
+# Or: Start everything in Docker
+make dev-full
 ```
 
-This will start:
+The `make dev` command will start:
 - PostgreSQL on port 5432
-- Redis on port 6379
+- Redis on port 6380
 - MinIO on ports 9000 (API) and 9001 (Console)
+
+**Note**: If you encounter port conflicts, see the [Port Configuration](#-port-configuration) section below.
 
 ### 2. Run Database Migrations
 
 ```bash
+pnpm run db:generate
 pnpm run db:migrate
 ```
 
@@ -77,18 +90,38 @@ Edit the following files and add your API keys:
 
 ### 4. Start Development Servers
 
+#### Option A: Local Development (Recommended)
+
 ```bash
-pnpm run dev
+# Terminal 1 - API
+pnpm run dev --filter=@queen-mama/api
+
+# Terminal 2 - Web
+pnpm run dev --filter=@queen-mama/web
 ```
 
-This will start:
-- Frontend on http://localhost:3002
-- API on http://localhost:3001
-- API Docs on http://localhost:3001/api-docs
+Access points:
+- Frontend: http://localhost:3002
+- API: http://localhost:3003
+- API Health: http://localhost:3003/health
+- API Docs: http://localhost:3003/api-docs
+
+#### Option B: Everything in Docker
+
+```bash
+make dev-full
+```
+
+Check status with:
+```bash
+make status
+```
 
 ---
 
 ## 📚 Useful Commands
+
+### pnpm Commands
 
 ```bash
 # Install dependencies
@@ -120,6 +153,35 @@ pnpm run test
 
 # Clean build artifacts
 pnpm run clean
+```
+
+### Docker/Makefile Commands
+
+```bash
+# Development
+make dev              # Start infrastructure only (recommended)
+make dev-full         # Start all services in Docker
+make stop             # Stop all containers
+
+# Maintenance
+make rebuild          # Clean volumes + rebuild (fixes Prisma issues)
+make clean-volumes    # Remove node_modules volumes only
+make clean            # Remove all containers and volumes
+
+# Logs & Monitoring
+make logs             # Follow API and Web logs
+make logs-api         # Follow API logs only
+make logs-web         # Follow Web logs only
+make status           # Show container status and ports
+
+# Database
+make db-migrate       # Run Prisma migrations in Docker
+make db-studio        # Open Prisma Studio
+
+# Production
+make prod-build       # Build production images
+make prod-up          # Start production stack
+make prod-down        # Stop production stack
 ```
 
 ---
@@ -193,29 +255,137 @@ queen-mama/
 
 ---
 
+## 🔧 Port Configuration
+
+All ports are configurable to avoid conflicts with other Docker applications:
+
+| Service | Default Port | Environment Variable |
+|---------|--------------|---------------------|
+| Web | 3002 | `QM_WEB_PORT` |
+| API | 3003 | `QM_API_PORT` |
+| PostgreSQL | 5432 | `QM_POSTGRES_PORT` |
+| Redis | 6380 | `QM_REDIS_PORT` |
+| MinIO API | 9000 | `QM_MINIO_API_PORT` |
+| MinIO Console | 9001 | `QM_MINIO_CONSOLE_PORT` |
+
+### Changing Ports
+
+Create a `.env` file in the project root:
+
+```bash
+QM_WEB_PORT=3100
+QM_API_PORT=3101
+QM_POSTGRES_PORT=5433
+QM_REDIS_PORT=6381
+QM_MINIO_API_PORT=9010
+QM_MINIO_CONSOLE_PORT=9011
+```
+
+Or use environment variables directly:
+
+```bash
+QM_API_PORT=3100 QM_WEB_PORT=3101 make dev-full
+```
+
+---
+
 ## 🆘 Troubleshooting
 
 ### Docker Issues
-- Make sure Docker Desktop is running
-- Run `docker-compose down` and then `docker-compose up -d` to restart
+
+**Docker Desktop not running:**
+```bash
+# Make sure Docker Desktop is running first
+make status
+```
+
+**Services won't start:**
+```bash
+# Restart Docker services
+make stop
+make dev
+```
+
+**Stale Prisma binaries / "Binary targets mismatch" error:**
+```bash
+# Clean volumes and rebuild
+make rebuild
+```
 
 ### Port Already in Use
-- Check if ports 3000, 3001, 5432, 6379, 9000, 9001 are free
-- Kill processes using these ports or change ports in configuration
+
+If you see "port is already allocated" errors:
+
+1. **Option 1**: Use alternative ports (recommended)
+   ```bash
+   QM_API_PORT=3100 QM_WEB_PORT=3101 make dev-full
+   ```
+
+2. **Option 2**: Find and kill the process using the port
+   ```bash
+   # macOS/Linux
+   lsof -ti:3003 | xargs kill -9
+   ```
+
+3. **Option 3**: Create a `.env` file with custom ports (see [Port Configuration](#-port-configuration))
 
 ### Prisma Client Not Found
-- Run `pnpm run db:generate` to regenerate the Prisma client
+
+```bash
+# Regenerate Prisma client
+pnpm run db:generate
+```
+
+**If using Docker:**
+```bash
+make rebuild
+```
 
 ### Dependencies Issues
-- Delete `node_modules` and `pnpm-lock.yaml`
-- Run `pnpm install --frozen-lockfile`
+
+```bash
+# Clean install
+rm -rf node_modules pnpm-lock.yaml
+pnpm install --frozen-lockfile
+```
+
+**If using Docker:**
+```bash
+# Remove node_modules volumes and rebuild
+make clean-volumes
+docker compose build
+```
+
+### Volume Permission Issues
+
+If you encounter permission errors with Docker volumes:
+
+```bash
+# Remove volumes and recreate
+make clean-volumes
+make dev-full
+```
+
+### Health Check Failures
+
+Check if services are healthy:
+
+```bash
+make status
+
+# Test health endpoints manually
+curl http://localhost:3003/health
+curl http://localhost:3003/health/ready
+curl http://localhost:3002/api/health
+```
 
 ---
 
 ## 📞 Support
 
 For any issues or questions:
-- Check the main documentation in [claude.md](./claude.md)
+- Check the main documentation in [CLAUDE.md](./CLAUDE.md)
+- Docker-specific issues: see [DOCKER.md](./DOCKER.md)
 - Create an issue on GitHub
 - Email: jerome@jaap.fr
 
