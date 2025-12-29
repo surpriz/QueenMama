@@ -181,7 +181,6 @@ describe('AuthService', () => {
       firstName: 'John',
       lastName: 'Doe',
       company: 'Test Corp',
-      plan: 'STARTER',
       role: 'USER',
       isVerified: true,
     };
@@ -200,7 +199,6 @@ describe('AuthService', () => {
         firstName: mockUser.firstName,
         lastName: mockUser.lastName,
         company: mockUser.company,
-        plan: mockUser.plan,
         role: mockUser.role,
         isVerified: mockUser.isVerified,
       });

@@ -16,8 +16,10 @@ import { AdminGuard } from './guards/admin.guard';
 import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
 import { UpdateLeadDto } from '../leads/dto/update-lead.dto';
+import { UpdateCampaignPricingDto, AnalyzePricingDto } from './dto/update-campaign-pricing.dto';
 import { InteractionType } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -117,6 +119,35 @@ export class AdminController {
     @Body() body: { reason?: string },
   ) {
     return this.adminService.rejectCampaign(id, body.reason);
+  }
+
+  // ============= PRICING MANAGEMENT =============
+
+  @Post('campaigns/analyze-pricing')
+  @ApiOperation({ summary: 'Analyze pricing for a campaign based on TAM and difficulty' })
+  @ApiResponse({ status: 200, description: 'Pricing analysis with recommendation' })
+  async analyzePricing(@Body() dto: AnalyzePricingDto) {
+    return this.adminService.analyzePricing(dto);
+  }
+
+  @Patch('campaigns/:id/pricing')
+  @ApiOperation({ summary: 'Set campaign pricing (GO decision)' })
+  @ApiResponse({ status: 200, description: 'Campaign pricing updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid pricing or campaign status' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async updateCampaignPricing(
+    @Param('id') id: string,
+    @Body() dto: UpdateCampaignPricingDto,
+    @CurrentUser() admin: { id: string },
+  ) {
+    return this.adminService.updateCampaignPricing(id, dto, admin.id);
+  }
+
+  @Get('campaigns/pending-pricing')
+  @ApiOperation({ summary: 'Get campaigns awaiting pricing decision' })
+  @ApiResponse({ status: 200, description: 'List of campaigns needing pricing' })
+  async getCampaignsPendingPricing() {
+    return this.adminService.getCampaignsPendingPricing();
   }
 
   // ============= LEAD MANAGEMENT =============

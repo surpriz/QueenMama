@@ -34,6 +34,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CampaignStatus } from '@/lib/api';
+import { CampaignPricingAnalyzer } from './CampaignPricingAnalyzer';
+import { useQueryClient } from '@tanstack/react-query';
 
 const getStatusBadge = (status: string) => {
   const variants: Record<string, { className: string }> = {
@@ -53,12 +55,18 @@ export default function AdminCampaignDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const queryClient = useQueryClient();
 
-  const { data: campaign, isLoading } = useAdminCampaign(id);
+  const { data: campaign, isLoading, refetch } = useAdminCampaign(id);
   const approveCampaign = useApproveCampaign();
   const rejectCampaign = useRejectCampaign();
   const updateCampaign = useUpdateAdminCampaign();
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+
+  const handlePricingUpdated = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns'] });
+  };
 
   // Redirect if not admin
   useEffect(() => {
@@ -159,8 +167,10 @@ export default function AdminCampaignDetailPage() {
       ? ((campaign.totalQualified / campaign.totalReplies) * 100).toFixed(1)
       : '0.0';
 
-  const spent = campaign.totalPaid * campaign.pricePerLead;
+  const pricePerLead = campaign.pricePerLead ?? 0;
+  const spent = campaign.totalPaid * pricePerLead;
   const remaining = campaign.budget - spent;
+  const hasPricing = campaign.pricePerLead !== null;
 
   return (
     <DashboardLayout>
@@ -247,10 +257,11 @@ export default function AdminCampaignDetailPage() {
                   variant="default"
                   size="sm"
                   onClick={handleApproveCampaign}
-                  disabled={approveCampaign.isPending}
+                  disabled={approveCampaign.isPending || !hasPricing}
+                  title={!hasPricing ? 'Définir le prix avant d\'approuver' : undefined}
                 >
                   <CheckCircle className="h-4 w-4 mr-1" />
-                  Approve
+                  {hasPricing ? 'Approve' : 'Prix requis'}
                 </Button>
                 <Button
                   variant="destructive"
@@ -359,6 +370,12 @@ export default function AdminCampaignDetailPage() {
           </Card>
         </div>
 
+        {/* Pricing Analyzer - Show prominently for campaigns needing pricing */}
+        <CampaignPricingAnalyzer
+          campaign={campaign}
+          onPricingUpdated={handlePricingUpdated}
+        />
+
         {/* Campaign Details */}
         <Card>
           <CardHeader>
@@ -378,7 +395,13 @@ export default function AdminCampaignDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Price per Lead</p>
-                <p className="font-medium">€{campaign.pricePerLead.toFixed(0)}</p>
+                <p className="font-medium">
+                  {campaign.pricePerLead !== null ? (
+                    `€${campaign.pricePerLead.toFixed(0)}`
+                  ) : (
+                    <span className="text-orange-600">Non défini</span>
+                  )}
+                </p>
               </div>
               {campaign.maxLeads && (
                 <div>

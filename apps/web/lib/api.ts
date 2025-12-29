@@ -225,13 +225,41 @@ export interface AdminUser {
   role: 'USER' | 'ADMIN';
   status: 'ACTIVE' | 'BLOCKED' | 'DELETED';
   isVerified: boolean;
-  plan: string;
   createdAt: string;
   updatedAt: string;
   _count: {
     campaigns: number;
     payments: number;
   };
+}
+
+// Market difficulty enum
+export enum MarketDifficulty {
+  EASY = 'EASY',
+  MEDIUM = 'MEDIUM',
+  HARD = 'HARD',
+  VERY_HARD = 'VERY_HARD',
+}
+
+// Pricing analysis types
+export interface PricingAnalysis {
+  recommendedPrice: number;
+  priceRange: { min: number; max: number };
+  recommendation: 'GO' | 'GO_WITH_CAUTION' | 'NO_GO';
+  reason: string;
+  estimatedLeadsPerMonth: { min: number; max: number };
+  estimatedRevenuePerMonth: { min: number; max: number };
+  input: {
+    estimatedTam: number;
+    marketDifficulty: MarketDifficulty;
+  };
+}
+
+export interface UpdateCampaignPricingDto {
+  estimatedTam: number;
+  marketDifficulty: MarketDifficulty;
+  pricePerLead: number;
+  adminNotes?: string;
 }
 
 export interface AdminCampaign {
@@ -247,8 +275,15 @@ export interface AdminCampaign {
     [key: string]: any;
   };
   budget: number;
-  pricePerLead: number;
+  pricePerLead: number | null;
   maxLeads?: number;
+  // Pricing analysis fields
+  estimatedTam?: number | null;
+  marketDifficulty?: MarketDifficulty | null;
+  adminNotes?: string | null;
+  priceApprovedAt?: string | null;
+  priceApprovedBy?: string | null;
+  // Stats
   totalContacted: number;
   totalReplies: number;
   totalQualified: number;
@@ -310,6 +345,16 @@ export const adminApi = {
 
   rejectCampaign: (id: string, reason?: string) =>
     api.patch<{ message: string; campaign: AdminCampaign }>(`/admin/campaigns/${id}/reject`, { reason }).then((res) => res.data),
+
+  // Pricing management
+  analyzePricing: (data: { estimatedTam: number; marketDifficulty: MarketDifficulty }) =>
+    api.post<PricingAnalysis>('/admin/campaigns/analyze-pricing', data).then((res) => res.data),
+
+  updateCampaignPricing: (id: string, data: UpdateCampaignPricingDto) =>
+    api.patch<{ message: string; campaign: AdminCampaign; analysis: PricingAnalysis; warning?: string }>(`/admin/campaigns/${id}/pricing`, data).then((res) => res.data),
+
+  getCampaignsPendingPricing: () =>
+    api.get<{ count: number; campaigns: AdminCampaign[] }>('/admin/campaigns/pending-pricing').then((res) => res.data),
 
   // Lead management
   getAllLeads: () =>

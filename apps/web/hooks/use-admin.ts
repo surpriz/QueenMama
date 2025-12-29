@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi, UpdateCampaignDto, CreateLeadDto, UpdateLeadDto } from '@/lib/api';
+import { adminApi, UpdateCampaignDto, CreateLeadDto, UpdateLeadDto, UpdateCampaignPricingDto, MarketDifficulty } from '@/lib/api';
 
 // Stale time constants (in milliseconds)
 const STALE_TIME = {
@@ -158,6 +158,40 @@ export function useRejectCampaign() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns'] });
     },
+  });
+}
+
+// ============= PRICING MANAGEMENT =============
+
+// Analyze pricing
+export function useAnalyzePricing() {
+  return useMutation({
+    mutationFn: (data: { estimatedTam: number; marketDifficulty: MarketDifficulty }) =>
+      adminApi.analyzePricing(data),
+  });
+}
+
+// Update campaign pricing
+export function useUpdateCampaignPricing() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateCampaignPricingDto }) =>
+      adminApi.updateCampaignPricing(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns', 'pending-pricing'] });
+    },
+  });
+}
+
+// Get campaigns pending pricing
+export function useCampaignsPendingPricing() {
+  return useQuery({
+    queryKey: ['admin', 'campaigns', 'pending-pricing'],
+    queryFn: () => adminApi.getCampaignsPendingPricing(),
+    staleTime: STALE_TIME.LIST,
   });
 }
 

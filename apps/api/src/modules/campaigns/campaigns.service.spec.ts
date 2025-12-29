@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
-import { CampaignStatus, LeadStatus, Plan } from '@prisma/client';
+import { CampaignStatus } from '@prisma/client';
 import { CampaignsService } from './campaigns.service';
 import { PrismaService } from '../../common/services/prisma.service';
 
 describe('CampaignsService', () => {
   let service: CampaignsService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     customer: {
@@ -30,7 +29,6 @@ describe('CampaignsService', () => {
 
   const mockCustomer = {
     id: mockCustomerId,
-    plan: Plan.STARTER,
   };
 
   const mockCampaign = {
@@ -42,7 +40,7 @@ describe('CampaignsService', () => {
     targetCriteria: { industries: ['tech'], locations: ['France'] },
     budget: 1000,
     maxLeads: 50,
-    pricePerLead: 30,
+    pricePerLead: null, // Null until admin sets it via GO/NO-GO
     totalContacted: 100,
     totalReplies: 20,
     totalQualified: 10,
@@ -61,7 +59,6 @@ describe('CampaignsService', () => {
     }).compile();
 
     service = module.get<CampaignsService>(CampaignsService);
-    prisma = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
   });
@@ -86,7 +83,7 @@ describe('CampaignsService', () => {
 
       expect(mockPrismaService.customer.findUnique).toHaveBeenCalledWith({
         where: { id: mockCustomerId },
-        select: { plan: true },
+        select: { id: true },
       });
       expect(mockPrismaService.campaign.create).toHaveBeenCalledWith({
         data: {
@@ -96,7 +93,7 @@ describe('CampaignsService', () => {
           targetCriteria: createCampaignDto.targetCriteria,
           budget: createCampaignDto.budget,
           maxLeads: createCampaignDto.maxLeads,
-          pricePerLead: 30, // STARTER plan price
+          // pricePerLead is null - will be set by admin after GO/NO-GO analysis
           status: CampaignStatus.DRAFT,
         },
         include: {

@@ -4,16 +4,21 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { UserRole, AccountStatus, CampaignStatus, LeadStatus, InteractionType } from '@prisma/client';
+import { UserRole, AccountStatus, CampaignStatus, LeadStatus, InteractionType, MarketDifficulty } from '@prisma/client';
 import { PrismaService } from '../../common/services/prisma.service';
 import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
 import { UpdateLeadDto } from '../leads/dto/update-lead.dto';
+import { UpdateCampaignPricingDto, AnalyzePricingDto } from './dto/update-campaign-pricing.dto';
 import {
   PaginationDto,
   PaginatedResult,
   createPaginatedResult,
 } from '../../common/dto/pagination.dto';
+import {
+  analyzeCampaignPricing,
+  validateCustomPrice,
+} from '../../common/constants/pricing';
 
 @Injectable()
 export class AdminService {
@@ -51,7 +56,6 @@ export class AdminService {
           role: true,
           status: true,
           isVerified: true,
-          plan: true,
           createdAt: true,
           updatedAt: true,
           _count: {
@@ -84,8 +88,6 @@ export class AdminService {
         role: true,
         status: true,
         isVerified: true,
-        plan: true,
-        subscriptionStatus: true,
         credits: true,
         creditsUsed: true,
         createdAt: true,
@@ -95,6 +97,7 @@ export class AdminService {
             id: true,
             name: true,
             status: true,
+            pricePerLead: true,
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
@@ -329,6 +332,11 @@ export class AdminService {
         budget: true,
         pricePerLead: true,
         maxLeads: true,
+        estimatedTam: true,
+        marketDifficulty: true,
+        adminNotes: true,
+        priceApprovedAt: true,
+        priceApprovedBy: true,
         totalContacted: true,
         totalReplies: true,
         totalQualified: true,
@@ -344,7 +352,6 @@ export class AdminService {
             firstName: true,
             lastName: true,
             company: true,
-            plan: true,
           },
         },
         emailSequences: {
@@ -420,7 +427,7 @@ export class AdminService {
   async approveCampaign(id: string) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id },
-      select: { id: true, status: true, emailSequences: true },
+      select: { id: true, status: true, pricePerLead: true, emailSequences: true },
     });
 
     if (!campaign) {
@@ -430,6 +437,12 @@ export class AdminService {
     if (campaign.status !== CampaignStatus.PENDING_REVIEW) {
       throw new BadRequestException(
         `Campaign must be in PENDING_REVIEW status to be approved. Current status: ${campaign.status}`,
+      );
+    }
+
+    if (campaign.pricePerLead === null) {
+      throw new BadRequestException(
+        'Campaign must have a price per lead set before approval. Use the pricing endpoint first.',
       );
     }
 
@@ -499,6 +512,129 @@ export class AdminService {
         ? `Campaign rejected: ${reason}`
         : 'Campaign rejected successfully',
       campaign: updatedCampaign,
+    };
+  }
+
+  // ============= PRICING MANAGEMENT =============
+
+  /**
+   * Analyze pricing for a campaign based on TAM and difficulty
+   */
+  async analyzePricing(dto: AnalyzePricingDto) {
+    const analysis = analyzeCampaignPricing(dto.estimatedTam, dto.marketDifficulty);
+    return {
+      ...analysis,
+      input: {
+        estimatedTam: dto.estimatedTam,
+        marketDifficulty: dto.marketDifficulty,
+      },
+    };
+  }
+
+  /**
+   * Update campaign pricing (GO decision)
+   */
+  async updateCampaignPricing(
+    id: string,
+    dto: UpdateCampaignPricingDto,
+    adminId: string,
+  ) {
+    // Verify campaign exists
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id },
+      select: { id: true, status: true, pricePerLead: true },
+    });
+
+    if (!campaign) {
+      throw new NotFoundException(`Campaign with ID ${id} not found`);
+    }
+
+    // Validate custom price
+    const priceValidation = validateCustomPrice(
+      dto.pricePerLead,
+      dto.estimatedTam,
+      dto.marketDifficulty,
+    );
+
+    if (!priceValidation.valid) {
+      throw new BadRequestException(priceValidation.warning);
+    }
+
+    // Get pricing analysis for context
+    const analysis = analyzeCampaignPricing(dto.estimatedTam, dto.marketDifficulty);
+
+    // Update campaign with pricing
+    const updatedCampaign = await this.prisma.campaign.update({
+      where: { id },
+      data: {
+        pricePerLead: dto.pricePerLead,
+        estimatedTam: dto.estimatedTam,
+        marketDifficulty: dto.marketDifficulty,
+        adminNotes: dto.adminNotes,
+        priceApprovedAt: new Date(),
+        priceApprovedBy: adminId,
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            company: true,
+          },
+        },
+      },
+    });
+
+    // TODO: Send notification to customer about approved pricing
+
+    return {
+      message: 'Campaign pricing updated successfully',
+      campaign: updatedCampaign,
+      analysis,
+      warning: priceValidation.warning,
+    };
+  }
+
+  /**
+   * Get campaigns awaiting pricing decision
+   */
+  async getCampaignsPendingPricing() {
+    const campaigns = await this.prisma.campaign.findMany({
+      where: {
+        OR: [
+          { pricePerLead: null },
+          { status: CampaignStatus.PENDING_REVIEW },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        targetCriteria: true,
+        budget: true,
+        pricePerLead: true,
+        estimatedTam: true,
+        marketDifficulty: true,
+        createdAt: true,
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            company: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' }, // Oldest first
+    });
+
+    return {
+      count: campaigns.length,
+      campaigns,
     };
   }
 

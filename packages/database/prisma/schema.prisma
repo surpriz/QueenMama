@@ -37,13 +37,10 @@ model Customer {
   status        AccountStatus   @default(ACTIVE)
   isVerified    Boolean         @default(false)
 
-  // Subscription
-  plan            Plan     @default(PAY_PER_LEAD)
+  // Stripe (pour paiements one-time uniquement)
   stripeCustomerId String?  @unique
-  subscriptionId   String?
-  subscriptionStatus SubscriptionStatus @default(INACTIVE)
 
-  // Billing
+  // Billing (pour futur usage)
   credits         Int      @default(0)
   creditsUsed     Int      @default(0)
 
@@ -58,19 +55,12 @@ model Customer {
   @@index([status])
 }
 
-enum Plan {
-  PAY_PER_LEAD      // 0€/mo + 60€/lead
-  STARTER           // 99€/mo + 30€/lead
-  GROWTH            // 299€/mo + 25€/lead
-  SCALE             // 999€/mo + 20€/lead
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  INACTIVE
-  PAST_DUE
-  CANCELED
-  TRIALING
+// Enum MarketDifficulty pour la tarification dynamique
+enum MarketDifficulty {
+  EASY        // Marché facile, beaucoup de prospects
+  MEDIUM      // Marché standard
+  HARD        // Marché difficile, peu de prospects
+  VERY_HARD   // Marché très niché
 }
 
 // ============= CAMPAIGNS =============
@@ -87,10 +77,17 @@ model Campaign {
   // ICP (Ideal Customer Profile)
   targetCriteria Json // { industries: [], companySize: [], locations: [], titles: [] }
 
-  // Budget & Pricing
+  // Budget & Pricing (tarification dynamique)
   budget          Float
-  pricePerLead    Float // Dynamic based on plan
-  maxLeads        Int?  // Optional cap
+  pricePerLead    Float?  // Null jusqu'à validation par admin
+  maxLeads        Int?    // Optional cap
+
+  // Analyse du marché (rempli par admin)
+  estimatedTam      Int?              // TAM estimé (nombre de prospects trouvés)
+  marketDifficulty  MarketDifficulty? // Difficulté du marché
+  adminNotes        String?           // Notes de l'admin sur l'analyse
+  priceApprovedAt   DateTime?         // Date de validation du prix
+  priceApprovedBy   String?           // ID de l'admin qui a validé
 
   // Email Sequence
   emailSequences  EmailSequence[]
@@ -259,9 +256,8 @@ model Payment {
 }
 
 enum PaymentType {
-  SUBSCRIPTION  // Monthly subscription
   LEAD_UNLOCK   // One-time lead unlock
-  CREDITS       // Bulk credits purchase
+  CREDITS       // Bulk credits purchase (pour futur usage)
 }
 
 enum PaymentStatus {

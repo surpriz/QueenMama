@@ -12,25 +12,24 @@ import {
   PaginatedResult,
   createPaginatedResult,
 } from '../../common/dto/pagination.dto';
-import { getPricePerLead } from '../../common/constants/pricing';
 
 @Injectable()
 export class CampaignsService {
   constructor(private readonly prisma: PrismaService) {}
+
   async create(customerId: string, createCampaignDto: CreateCampaignDto) {
-    // Get customer's plan to calculate price per lead
+    // Verify customer exists
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      select: { plan: true },
+      select: { id: true },
     });
 
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
 
-    const pricePerLead = getPricePerLead(customer.plan);
-
-    // Create campaign
+    // Create campaign with pricePerLead = null
+    // Admin will set the price after analyzing the market (GO/NO-GO decision)
     const campaign = await this.prisma.campaign.create({
       data: {
         customerId,
@@ -39,7 +38,7 @@ export class CampaignsService {
         targetCriteria: createCampaignDto.targetCriteria,
         budget: createCampaignDto.budget,
         maxLeads: createCampaignDto.maxLeads,
-        pricePerLead,
+        // pricePerLead is null - will be set by admin after pricing analysis
         status: CampaignStatus.DRAFT,
       },
       include: {
@@ -170,6 +169,9 @@ export class CampaignsService {
   async getStats(customerId: string, id: string) {
     const campaign = await this.findOne(customerId, id);
 
+    const pricePerLead = campaign.pricePerLead ?? 0;
+    const spent = campaign.totalPaid * pricePerLead;
+
     return {
       id: campaign.id,
       name: campaign.name,
@@ -187,8 +189,9 @@ export class CampaignsService {
           ? (campaign.totalQualified / campaign.totalReplies) * 100
           : 0,
       budget: campaign.budget,
-      spent: campaign.totalPaid * campaign.pricePerLead,
-      remaining: campaign.budget - campaign.totalPaid * campaign.pricePerLead,
+      pricePerLead: campaign.pricePerLead,
+      spent,
+      remaining: campaign.budget - spent,
     };
   }
 

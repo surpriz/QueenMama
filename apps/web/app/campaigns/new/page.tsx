@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Info } from 'lucide-react';
 import { useCreateCampaign } from '@/hooks/use-campaigns';
 import { CreateCampaignDto } from '@/lib/api';
 
@@ -271,11 +271,28 @@ export default function NewCampaignPage() {
                   </p>
                 </div>
 
+                {/* Pricing Info */}
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-blue-900 mb-1">Tarification dynamique</h3>
+                      <p className="text-sm text-blue-800">
+                        Le prix par lead sera défini par notre équipe après analyse de votre marché cible.
+                        Vous serez notifié une fois le prix validé (généralement sous 24h).
+                      </p>
+                      <p className="text-sm text-blue-700 mt-2">
+                        <span className="font-medium">Fourchette indicative:</span> 30€ - 60€/lead
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-muted p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Campaign Summary</h3>
+                  <h3 className="font-medium mb-2">Récapitulatif de la campagne</h3>
                   <dl className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Name:</dt>
+                      <dt className="text-muted-foreground">Nom:</dt>
                       <dd className="font-medium">{watch('name') || '-'}</dd>
                     </div>
                     <div className="flex justify-between">
@@ -284,7 +301,11 @@ export default function NewCampaignPage() {
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Max Leads:</dt>
-                      <dd className="font-medium">{watch('maxLeads') || 'Unlimited'}</dd>
+                      <dd className="font-medium">{watch('maxLeads') || 'Illimité'}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Prix/Lead:</dt>
+                      <dd className="font-medium text-blue-600">À définir par l'équipe</dd>
                     </div>
                   </dl>
                 </div>

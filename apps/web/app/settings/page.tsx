@@ -34,15 +34,17 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Subscription</CardTitle>
-              <CardDescription>Manage your subscription plan</CardDescription>
+              <CardTitle>Facturation</CardTitle>
+              <CardDescription>Votre modèle de tarification</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Current Plan</label>
-                <p className="text-sm text-muted-foreground">Growth - €299/month + €25/lead</p>
+                <label className="text-sm font-medium">Tarification</label>
+                <p className="text-sm text-muted-foreground">Pay-per-lead (30€ - 60€/lead selon le marché)</p>
               </div>
-              <Button>Upgrade Plan</Button>
+              <p className="text-xs text-muted-foreground">
+                Le prix par lead est défini pour chaque campagne selon l'analyse de votre marché cible.
+              </p>
             </CardContent>
           </Card>
 

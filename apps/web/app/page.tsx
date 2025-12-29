@@ -21,7 +21,6 @@ import {
   Crown,
   Sparkles,
   PlayCircle,
-  Check,
   Twitter,
   Linkedin,
   Github,
@@ -72,53 +71,26 @@ const steps = [
   },
 ];
 
-const pricingPlans = [
+const pricingFeatures = [
   {
-    name: 'Pay Per Lead',
-    description: 'Perfect for testing',
-    price: '0',
-    period: '/month',
-    perLead: '60',
-    featured: false,
-    cta: 'Start Free',
-    features: [
-      'No monthly commitment',
-      'Pay only for results',
-      'Email support',
-      'Basic analytics',
-    ],
+    title: 'Aucun abonnement',
+    description: 'Pas de frais mensuels, pas d\'engagement',
+    icon: CheckCircle,
   },
   {
-    name: 'Growth',
-    description: 'For scaling teams',
-    price: '299',
-    period: '/month',
-    perLead: '25',
-    featured: true,
-    cta: 'Get Started',
-    features: [
-      'Lower cost per lead',
-      'Priority support',
-      'Advanced analytics',
-      'Custom ICP setup',
-      'Dedicated CSM',
-    ],
+    title: 'Prix fixé à l\'avance',
+    description: 'Vous connaissez le prix avant de lancer',
+    icon: Shield,
   },
   {
-    name: 'Scale',
-    description: 'For enterprise',
-    price: '999',
-    period: '/month',
-    perLead: '20',
-    featured: false,
-    cta: 'Contact Sales',
-    features: [
-      'Lowest cost per lead',
-      'White-glove onboarding',
-      'Custom integrations',
-      'SLA guarantee',
-      'Multiple campaigns',
-    ],
+    title: 'Analyse gratuite',
+    description: 'Notre équipe analyse votre marché gratuitement',
+    icon: Target,
+  },
+  {
+    title: 'Satisfaction garantie',
+    description: 'Remboursement si vous n\'êtes pas satisfait',
+    icon: Star,
   },
 ];
 
@@ -455,90 +427,87 @@ export default function LandingPage() {
               className="text-center max-w-3xl mx-auto mb-16"
             >
               <span className="inline-block px-4 py-2 rounded-full bg-green-500/10 text-green-600 text-sm font-medium mb-4">
-                Transparent Pricing
+                Tarification transparente
               </span>
               <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                Pay for{' '}
+                Payez uniquement pour{' '}
                 <span className="bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent">
-                  results, not promises
+                  les résultats
                 </span>
               </h2>
               <p className="text-xl text-muted-foreground">
-                Start free, scale as you grow. No hidden fees.
+                Aucun abonnement. Prix adapté à votre marché.
               </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              {pricingPlans.map((plan, i) => (
-                <motion.div
-                  key={plan.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className={`relative rounded-3xl ${plan.featured ? 'md:-mt-8 md:mb-8' : ''}`}
-                >
-                  {/* Featured plan gradient border */}
-                  {plan.featured && (
-                    <div className="absolute -inset-px bg-gradient-to-b from-purple-500 to-blue-500 rounded-3xl" />
-                  )}
+            {/* Single Pricing Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="max-w-2xl mx-auto"
+            >
+              <div className="relative rounded-3xl">
+                {/* Gradient border */}
+                <div className="absolute -inset-px bg-gradient-to-b from-purple-500 to-blue-500 rounded-3xl" />
 
-                  <div
-                    className={`relative h-full rounded-3xl p-8 ${
-                      plan.featured ? 'bg-card' : 'bg-card/50 backdrop-blur-sm border border-white/10'
-                    }`}
-                  >
-                    {/* Popular badge */}
-                    {plan.featured && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-medium shadow-glow-sm">
-                        Most Popular
-                      </div>
-                    )}
+                <div className="relative rounded-3xl p-10 bg-card">
+                  {/* Badge */}
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-medium shadow-glow-sm">
+                    100% Pay-per-Lead
+                  </div>
 
-                    <div className="text-center mb-8">
-                      <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
-                      <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-5xl font-bold">{plan.price}</span>
-                        <span className="text-muted-foreground">{plan.period}</span>
-                      </div>
-                      {plan.perLead && (
-                        <p className="text-sm text-muted-foreground mt-2">+ {plan.perLead}/lead</p>
-                      )}
+                  <div className="text-center mb-10">
+                    <h3 className="text-2xl font-semibold mb-3">Tarification dynamique</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Le prix dépend de votre marché cible. Plus l'audience est large, plus le prix est bas.
+                    </p>
+
+                    {/* Price range */}
+                    <div className="flex items-baseline justify-center gap-2">
+                      <span className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+                        30€ - 60€
+                      </span>
+                      <span className="text-xl text-muted-foreground">/lead</span>
                     </div>
 
-                    <ul className="space-y-4 mb-8">
-                      {plan.features.map((feature, j) => (
-                        <li key={j} className="flex items-center gap-3">
-                          <div
-                            className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                              plan.featured
-                                ? 'bg-gradient-to-br from-purple-500 to-blue-500'
-                                : 'bg-green-500/20'
-                            }`}
-                          >
-                            <Check className={`h-3 w-3 ${plan.featured ? 'text-white' : 'text-green-500'}`} />
-                          </div>
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Link href="/register" className="block">
-                      <Button
-                        className={`w-full h-12 ${
-                          plan.featured
-                            ? 'bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 shadow-glow-sm hover:shadow-glow-md'
-                            : 'bg-secondary hover:bg-secondary/80'
-                        }`}
-                      >
-                        {plan.cta}
-                      </Button>
-                    </Link>
+                    <p className="text-sm text-muted-foreground mt-4">
+                      Prix exact défini après analyse de votre marché
+                    </p>
                   </div>
-                </motion.div>
-              ))}
-            </div>
+
+                  {/* Features grid */}
+                  <div className="grid sm:grid-cols-2 gap-6 mb-10">
+                    {pricingFeatures.map((feature, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/10 flex items-center justify-center shrink-0">
+                          <feature.icon className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{feature.title}</h4>
+                          <p className="text-sm text-muted-foreground">{feature.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CTA */}
+                  <Link href="/register" className="block">
+                    <Button
+                      size="lg"
+                      className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 shadow-glow-sm hover:shadow-glow-md transition-all"
+                    >
+                      Demander une analyse gratuite
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+
+                  <p className="text-center text-sm text-muted-foreground mt-4">
+                    Analyse de marché offerte - Réponse sous 24h
+                  </p>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </section>
 

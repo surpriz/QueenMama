@@ -144,6 +144,13 @@ export class LeadsService {
       );
     }
 
+    // Check if pricing has been set by admin
+    if (lead.campaign.pricePerLead === null) {
+      throw new BadRequestException(
+        'Campaign pricing has not been set yet. Please wait for admin approval.',
+      );
+    }
+
     const unlockPrice = lead.campaign.pricePerLead;
 
     // For MVP: Simplified payment (no Stripe)
