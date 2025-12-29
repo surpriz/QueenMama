@@ -4,20 +4,46 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaClient } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { CookieOptions } from 'express';
+import { PrismaService } from '../../common/services/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
-const prisma = new PrismaClient();
-
 @Injectable()
 export class AuthService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
+
+  getCookieOptions(): CookieOptions {
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    };
+  }
+
+  getLogoutCookieOptions(): CookieOptions {
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    };
+  }
 
   async register(registerDto: RegisterDto) {
     // Check if user already exists
-    const existingUser = await prisma.customer.findUnique({
+    const existingUser = await this.prisma.customer.findUnique({
       where: { email: registerDto.email },
     });
 
@@ -29,7 +55,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
     // Create user
-    const user = await prisma.customer.create({
+    const user = await this.prisma.customer.create({
       data: {
         email: registerDto.email,
         password: hashedPassword,
@@ -58,7 +84,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     // Find user
-    const user = await prisma.customer.findUnique({
+    const user = await this.prisma.customer.findUnique({
       where: { email: loginDto.email },
     });
 
@@ -94,7 +120,7 @@ export class AuthService {
   }
 
   async getMe(userId: string) {
-    const user = await prisma.customer.findUnique({
+    const user = await this.prisma.customer.findUnique({
       where: { id: userId },
     });
 

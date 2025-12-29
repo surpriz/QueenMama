@@ -1,0 +1,101 @@
+# =============================================================================
+# Queen Mama - Docker Ignore
+# =============================================================================
+# Excludes files from Docker build context for faster builds and smaller images
+# =============================================================================
+
+# Dependencies - Docker handles these internally
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+.next
+**/.next
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE and editors
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+**/.DS_Store
+
+# Environment files (secrets - never include in build context)
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.prod.example
+
+# Test and coverage
+coverage
+**/coverage
+.nyc_output
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+**/*.test.tsx
+**/*.spec.tsx
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Turborepo cache
+.turbo
+**/.turbo
+
+# Development tools
+.husky
+.github
+.claude
+
+# Documentation (not needed in containers)
+*.md
+!README.md
+docs
+CHANGELOG*
+LICENSE*
+
+# Docker files not needed in context
+docker-compose*.yml
+Dockerfile*
+
+# Miscellaneous
+*.tar.gz
+*.zip
+*.tgz
+tmp
+temp
+.cache
+**/.cache
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Debug
+*.log
+logs
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Prisma
+**/prisma/migrations/.migration_lock.toml

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
+import { api } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,28 +25,17 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3003/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await api.post('/auth/login', formData);
+      const data = response.data;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      // Store the JWT token
-      localStorage.setItem('access_token', data.access_token);
+      // Store user info (token is in httpOnly cookie)
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      const message = err.response?.data?.message || err.message || 'Something went wrong';
+      setError(message);
     } finally {
       setIsLoading(false);
     }

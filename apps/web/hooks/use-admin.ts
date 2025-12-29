@@ -1,11 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi, UpdateCampaignDto, CreateLeadDto, UpdateLeadDto } from '@/lib/api';
 
+// Stale time constants (in milliseconds)
+const STALE_TIME = {
+  STATS: 2 * 60 * 1000, // 2 minutes
+  LIST: 5 * 60 * 1000, // 5 minutes
+  DETAIL: 5 * 60 * 1000, // 5 minutes
+};
+
 // Get admin statistics
 export function useAdminStats() {
   return useQuery({
     queryKey: ['admin', 'stats'],
     queryFn: () => adminApi.getStats(),
+    staleTime: STALE_TIME.STATS,
   });
 }
 
@@ -14,6 +22,7 @@ export function useAdminUsers() {
   return useQuery({
     queryKey: ['admin', 'users'],
     queryFn: () => adminApi.getAllUsers(),
+    staleTime: STALE_TIME.LIST,
   });
 }
 
@@ -23,6 +32,7 @@ export function useAdminUser(id: string) {
     queryKey: ['admin', 'users', id],
     queryFn: () => adminApi.getUser(id),
     enabled: !!id,
+    staleTime: STALE_TIME.DETAIL,
   });
 }
 
@@ -98,6 +108,7 @@ export function useAdminCampaigns() {
   return useQuery({
     queryKey: ['admin', 'campaigns'],
     queryFn: () => adminApi.getAllCampaigns(),
+    staleTime: STALE_TIME.LIST,
   });
 }
 
@@ -107,6 +118,7 @@ export function useAdminCampaign(id: string) {
     queryKey: ['admin', 'campaigns', id],
     queryFn: () => adminApi.getCampaign(id),
     enabled: !!id,
+    staleTime: STALE_TIME.DETAIL,
   });
 }
 
@@ -156,6 +168,7 @@ export function useAdminLeads() {
   return useQuery({
     queryKey: ['admin', 'leads'],
     queryFn: () => adminApi.getAllLeads(),
+    staleTime: STALE_TIME.LIST,
   });
 }
 
@@ -165,6 +178,7 @@ export function useAdminLead(id: string) {
     queryKey: ['admin', 'leads', id],
     queryFn: () => adminApi.getLead(id),
     enabled: !!id,
+    staleTime: STALE_TIME.DETAIL,
   });
 }
 

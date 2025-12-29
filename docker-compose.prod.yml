@@ -1,0 +1,257 @@
+# =============================================================================
+# Queen Mama - Production Docker Compose
+# =============================================================================
+# Deployment:
+#   1. Copy .env.prod.example to .env.prod and fill in values
+#   2. docker compose -f docker-compose.prod.yml up -d
+#   3. Run migrations: docker compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
+#
+# SSL Certificates:
+#   Traefik automatically obtains and renews Let's Encrypt certificates
+# =============================================================================
+
+name: queen-mama-prod
+
+services:
+  # ---------------------------------------------------------------------------
+  # Traefik Reverse Proxy (Auto SSL with Let's Encrypt)
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.0
+    container_name: qm-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - qm_traefik_letsencrypt:/letsencrypt
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+    networks:
+      - qm-network
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: qm-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - qm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qm-internal
+    restart: always
+    # No ports exposed - internal network only
+
+  # ---------------------------------------------------------------------------
+  # Redis Cache & Queue
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: qm-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - qm_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qm-internal
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # MinIO (S3-compatible storage)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: qm-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - qm_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - qm-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.${DOMAIN}`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+      - "traefik.docker.network=qm-network"
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # Backend API (NestJS)
+  # ---------------------------------------------------------------------------
+  api:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-queenmama}/api:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: production
+    container_name: qm-api
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      FRONTEND_URL: https://${DOMAIN}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - qm-network
+      - qm-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3003"
+      # Rate limiting
+      - "traefik.http.middlewares.api-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.api-ratelimit.ratelimit.burst=50"
+      - "traefik.http.routers.api.middlewares=api-ratelimit"
+      - "traefik.docker.network=qm-network"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # Frontend Web (Next.js)
+  # ---------------------------------------------------------------------------
+  web:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-queenmama}/web:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: https://api.${DOMAIN}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    container_name: qm-web
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - qm-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+      # Redirect www to non-www
+      - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https://www\\.(.+)"
+      - "traefik.http.middlewares.www-redirect.redirectregex.replacement=https://$${1}"
+      - "traefik.http.routers.web.middlewares=www-redirect"
+      - "traefik.docker.network=qm-network"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  # External network for Traefik routing
+  qm-network:
+    name: qm-network
+    driver: bridge
+
+  # Internal network for database access (not exposed)
+  qm-internal:
+    name: qm-internal
+    driver: bridge
+    internal: true
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  qm_postgres_data:
+    name: qm_postgres_data_prod
+  qm_redis_data:
+    name: qm_redis_data_prod
+  qm_minio_data:
+    name: qm_minio_data_prod
+  qm_traefik_letsencrypt:
+    name: qm_traefik_letsencrypt

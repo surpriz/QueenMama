@@ -14,11 +14,19 @@ export const campaignKeys = {
   stats: (id: string) => [...campaignKeys.detail(id), 'stats'] as const,
 };
 
+// Stale time constants (in milliseconds)
+const STALE_TIME = {
+  DASHBOARD: 2 * 60 * 1000, // 2 minutes
+  LIST: 5 * 60 * 1000, // 5 minutes
+  DETAIL: 5 * 60 * 1000, // 5 minutes
+};
+
 // Get all campaigns
 export function useCampaigns() {
   return useQuery({
     queryKey: campaignKeys.lists(),
     queryFn: () => campaignsApi.getAll(),
+    staleTime: STALE_TIME.LIST,
   });
 }
 
@@ -28,6 +36,7 @@ export function useCampaign(id: string) {
     queryKey: campaignKeys.detail(id),
     queryFn: () => campaignsApi.getOne(id),
     enabled: !!id,
+    staleTime: STALE_TIME.DETAIL,
   });
 }
 
@@ -37,6 +46,7 @@ export function useCampaignStats(id: string) {
     queryKey: campaignKeys.stats(id),
     queryFn: () => campaignsApi.getStats(id),
     enabled: !!id,
+    staleTime: STALE_TIME.DETAIL,
   });
 }
 
@@ -45,6 +55,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => campaignsApi.getDashboardStats(),
+    staleTime: STALE_TIME.DASHBOARD,
   });
 }
 

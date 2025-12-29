@@ -4,11 +4,16 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { UserRole, AccountStatus, CampaignStatus, InteractionType } from '@prisma/client';
+import { UserRole, AccountStatus, CampaignStatus, LeadStatus, InteractionType } from '@prisma/client';
 import { PrismaService } from '../../common/services/prisma.service';
 import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
 import { UpdateLeadDto } from '../leads/dto/update-lead.dto';
+import {
+  PaginationDto,
+  PaginatedResult,
+  createPaginatedResult,
+} from '../../common/dto/pagination.dto';
 
 @Injectable()
 export class AdminService {
@@ -30,32 +35,40 @@ export class AdminService {
     };
   }
 
-  // Get all users
-  async getAllUsers() {
-    const users = await this.prisma.customer.findMany({
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        company: true,
-        role: true,
-        status: true,
-        isVerified: true,
-        plan: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            campaigns: true,
-            payments: true,
+  // Get all users with pagination
+  async getAllUsers(pagination: PaginationDto): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      this.prisma.customer.findMany({
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          company: true,
+          role: true,
+          status: true,
+          isVerified: true,
+          plan: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              campaigns: true,
+              payments: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.customer.count(),
+    ]);
 
-    return users;
+    return createPaginatedResult(users, total, page, limit);
   }
 
   // Get single user
@@ -250,49 +263,57 @@ export class AdminService {
 
   // ============= CAMPAIGN MANAGEMENT =============
 
-  // Get all campaigns
-  async getAllCampaigns() {
-    const campaigns = await this.prisma.campaign.findMany({
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        status: true,
-        targetCriteria: true,
-        budget: true,
-        pricePerLead: true,
-        maxLeads: true,
-        totalContacted: true,
-        totalReplies: true,
-        totalQualified: true,
-        totalPaid: true,
-        createdAt: true,
-        updatedAt: true,
-        startedAt: true,
-        completedAt: true,
-        customer: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            company: true,
-          },
-        },
-        _count: {
-          select: {
-            leads: true,
-            emailSequences: true,
-          },
-        },
-      },
-      orderBy: [
-        { status: 'asc' }, // PENDING_REVIEW first
-        { createdAt: 'desc' },
-      ],
-    });
+  // Get all campaigns with pagination
+  async getAllCampaigns(pagination: PaginationDto): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
 
-    return campaigns;
+    const [campaigns, total] = await Promise.all([
+      this.prisma.campaign.findMany({
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          status: true,
+          targetCriteria: true,
+          budget: true,
+          pricePerLead: true,
+          maxLeads: true,
+          totalContacted: true,
+          totalReplies: true,
+          totalQualified: true,
+          totalPaid: true,
+          createdAt: true,
+          updatedAt: true,
+          startedAt: true,
+          completedAt: true,
+          customer: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              company: true,
+            },
+          },
+          _count: {
+            select: {
+              leads: true,
+              emailSequences: true,
+            },
+          },
+        },
+        orderBy: [
+          { status: 'asc' }, // PENDING_REVIEW first
+          { createdAt: 'desc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      this.prisma.campaign.count(),
+    ]);
+
+    return createPaginatedResult(campaigns, total, page, limit);
   }
 
   // Get single campaign
@@ -518,7 +539,7 @@ export class AdminService {
           companySize: createLeadDto.companySize,
           companyIndustry: createLeadDto.companyIndustry,
           location: createLeadDto.location,
-          status: createLeadDto.status || 'QUALIFIED',
+          status: createLeadDto.status || LeadStatus.QUALIFIED,
           qualityScore: createLeadDto.qualityScore,
           sentiment: createLeadDto.sentiment,
         },
@@ -549,7 +570,7 @@ export class AdminService {
         data: {
           totalContacted: { increment: 1 },
           totalReplies: createLeadDto.responseContent ? { increment: 1 } : undefined,
-          totalQualified: createLeadDto.status === 'QUALIFIED' ? { increment: 1 } : undefined,
+          totalQualified: createLeadDto.status === LeadStatus.QUALIFIED ? { increment: 1 } : undefined,
         },
       });
 
@@ -563,30 +584,38 @@ export class AdminService {
   }
 
   /**
-   * Get all leads (admin)
+   * Get all leads (admin) with pagination
    */
-  async getAllLeads() {
-    const leads = await this.prisma.lead.findMany({
-      include: {
-        campaign: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
+  async getAllLeads(pagination: PaginationDto): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [leads, total] = await Promise.all([
+      this.prisma.lead.findMany({
+        include: {
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+          interactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
           },
         },
-        interactions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
-      },
-      orderBy: [
-        { status: 'asc' },
-        { createdAt: 'desc' },
-      ],
-    });
+        orderBy: [
+          { status: 'asc' },
+          { createdAt: 'desc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      this.prisma.lead.count(),
+    ]);
 
-    return leads;
+    return createPaginatedResult(leads, total, page, limit);
   }
 
   /**

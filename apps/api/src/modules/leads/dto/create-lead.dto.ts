@@ -5,27 +5,27 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateLeadDto {
   @ApiProperty({ description: 'Campaign ID' })
   @IsString()
-  campaignId: string;
+  campaignId!: string;
 
   @ApiProperty({ description: 'First name' })
   @IsString()
-  firstName: string;
+  firstName!: string;
 
   @ApiProperty({ description: 'Last name' })
   @IsString()
-  lastName: string;
+  lastName!: string;
 
   @ApiProperty({ description: 'Email address' })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({ description: 'Company name' })
   @IsString()
-  company: string;
+  company!: string;
 
   @ApiProperty({ description: 'Job title' })
   @IsString()
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({ description: 'LinkedIn URL' })
   @IsOptional()

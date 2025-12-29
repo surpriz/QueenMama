@@ -8,15 +8,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true, // Send cookies with requests
 });
 
 // Handle auth errors
@@ -24,8 +16,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('access_token');
+      // Unauthorized - clear user data and redirect to login
+      // Cookie will be cleared by backend or expired automatically
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
@@ -261,6 +253,7 @@ export interface AdminCampaign {
   totalReplies: number;
   totalQualified: number;
   totalPaid: number;
+  emailSequences?: EmailSequence[];
   createdAt: string;
   updatedAt: string;
   startedAt?: string;

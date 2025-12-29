@@ -8,6 +8,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { PrismaModule } from './common/services/prisma.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PrismaModule } from './common/services/prisma.module';
       },
     ]),
     PrismaModule,
+    HealthModule,
     AuthModule,
     CampaignsModule,
     AdminModule,

@@ -4,54 +4,64 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { Plan } from '@prisma/client';
+import { LeadStatus } from '@prisma/client';
 import { PrismaService } from '../../common/services/prisma.service';
-
-// Price per lead based on plan
-const PRICE_PER_LEAD_MAP = {
-  [Plan.PAY_PER_LEAD]: 60,
-  [Plan.STARTER]: 30,
-  [Plan.GROWTH]: 25,
-  [Plan.SCALE]: 20,
-};
+import {
+  PaginationDto,
+  PaginatedResult,
+  createPaginatedResult,
+} from '../../common/dto/pagination.dto';
 
 @Injectable()
 export class LeadsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Get all leads for a customer
+   * Get all leads for a customer with pagination
    */
-  async getAllLeads(customerId: string) {
-    const leads = await this.prisma.lead.findMany({
-      where: { customerId },
-      include: {
-        campaign: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
+  async getAllLeads(
+    customerId: string,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [leads, total] = await Promise.all([
+      this.prisma.lead.findMany({
+        where: { customerId },
+        include: {
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+          interactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1, // Get latest interaction
           },
         },
-        interactions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1, // Get latest interaction
-        },
-      },
-      orderBy: [
-        { status: 'asc' },
-        { qualityScore: 'desc' },
-        { createdAt: 'desc' },
-      ],
-    });
+        orderBy: [
+          { status: 'asc' },
+          { qualityScore: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      this.prisma.lead.count({ where: { customerId } }),
+    ]);
 
     // Mask email for non-revealed leads
-    return leads.map((lead) => ({
+    const maskedLeads = leads.map((lead) => ({
       ...lead,
       email: lead.isRevealed ? lead.email : this.maskEmail(lead.email),
       phone: lead.isRevealed ? lead.phone : null,
       linkedinUrl: lead.isRevealed ? lead.linkedinUrl : null,
     }));
+
+    return createPaginatedResult(maskedLeads, total, page, limit);
   }
 
   /**
@@ -128,7 +138,7 @@ export class LeadsService {
     }
 
     // Check if lead is qualified
-    if (lead.status !== 'QUALIFIED' && lead.status !== 'INTERESTED') {
+    if (lead.status !== LeadStatus.QUALIFIED && lead.status !== LeadStatus.INTERESTED) {
       throw new BadRequestException(
         'Only qualified or interested leads can be unlocked',
       );
@@ -148,7 +158,7 @@ export class LeadsService {
           isRevealed: true,
           revealedAt: new Date(),
           paidAmount: unlockPrice,
-          status: 'PAID',
+          status: LeadStatus.PAID,
         },
         include: {
           campaign: {

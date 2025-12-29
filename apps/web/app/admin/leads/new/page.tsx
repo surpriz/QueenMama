@@ -47,9 +47,9 @@ export default function NewLeadPage() {
     companySize: '',
     companyIndustry: '',
     location: '',
-    status: 'QUALIFIED',
+    status: LeadStatus.QUALIFIED,
     qualityScore: 75,
-    sentiment: 'POSITIVE',
+    sentiment: Sentiment.POSITIVE,
     responseContent: '',
   });
 

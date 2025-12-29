@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
 import { UpdateLeadDto } from '../leads/dto/update-lead.dto';
 import { InteractionType } from '@prisma/client';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -32,8 +34,10 @@ export class AdminController {
   }
 
   @Get('users')
-  async getAllUsers() {
-    return this.adminService.getAllUsers();
+  @ApiOperation({ summary: 'Get all users (admin)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of users' })
+  async getAllUsers(@Query() pagination: PaginationDto) {
+    return this.adminService.getAllUsers(pagination);
   }
 
   @Get('users/:id')
@@ -70,9 +74,9 @@ export class AdminController {
 
   @Get('campaigns')
   @ApiOperation({ summary: 'Get all campaigns (admin)' })
-  @ApiResponse({ status: 200, description: 'List of all campaigns' })
-  async getAllCampaigns() {
-    return this.adminService.getAllCampaigns();
+  @ApiResponse({ status: 200, description: 'Paginated list of all campaigns' })
+  async getAllCampaigns(@Query() pagination: PaginationDto) {
+    return this.adminService.getAllCampaigns(pagination);
   }
 
   @Get('campaigns/:id')
@@ -127,9 +131,9 @@ export class AdminController {
 
   @Get('leads')
   @ApiOperation({ summary: 'Get all leads (admin)' })
-  @ApiResponse({ status: 200, description: 'List of all leads' })
-  async getAllLeads() {
-    return this.adminService.getAllLeads();
+  @ApiResponse({ status: 200, description: 'Paginated list of all leads' })
+  async getAllLeads(@Query() pagination: PaginationDto) {
+    return this.adminService.getAllLeads(pagination);
   }
 
   @Get('leads/:id')

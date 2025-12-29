@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,8 @@ import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../../common/types/auth.types';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('campaigns')
 @Controller('campaigns')
@@ -35,10 +38,10 @@ export class CampaignsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() createCampaignDto: CreateCampaignDto,
   ) {
-    return this.campaignsService.create(user.id, createCampaignDto);
+    return this.campaignsService.create(user.userId, createCampaignDto);
   }
 
   @Get('dashboard-stats')
@@ -47,18 +50,21 @@ export class CampaignsController {
     status: 200,
     description: 'Dashboard statistics',
   })
-  getDashboardStats(@CurrentUser() user: any) {
-    return this.campaignsService.getDashboardStats(user.id);
+  getDashboardStats(@CurrentUser() user: AuthenticatedUser) {
+    return this.campaignsService.getDashboardStats(user.userId);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all campaigns for the authenticated user' })
   @ApiResponse({
     status: 200,
-    description: 'List of campaigns',
+    description: 'Paginated list of campaigns',
   })
-  findAll(@CurrentUser() user: any) {
-    return this.campaignsService.findAll(user.id);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.campaignsService.findAll(user.userId, pagination);
   }
 
   @Get(':id')
@@ -69,8 +75,8 @@ export class CampaignsController {
   })
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   @ApiResponse({ status: 403, description: 'Access denied' })
-  findOne(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.campaignsService.findOne(user.id, id);
+  findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.campaignsService.findOne(user.userId, id);
   }
 
   @Get(':id/stats')
@@ -79,8 +85,8 @@ export class CampaignsController {
     status: 200,
     description: 'Campaign statistics',
   })
-  getStats(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.campaignsService.getStats(user.id, id);
+  getStats(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.campaignsService.getStats(user.userId, id);
   }
 
   @Patch(':id')
@@ -92,11 +98,11 @@ export class CampaignsController {
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   @ApiResponse({ status: 403, description: 'Access denied' })
   update(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() updateCampaignDto: UpdateCampaignDto,
   ) {
-    return this.campaignsService.update(user.id, id, updateCampaignDto);
+    return this.campaignsService.update(user.userId, id, updateCampaignDto);
   }
 
   @Delete(':id')
@@ -107,7 +113,7 @@ export class CampaignsController {
   })
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   @ApiResponse({ status: 403, description: 'Access denied or cannot delete active campaign' })
-  remove(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.campaignsService.remove(user.id, id);
+  remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.campaignsService.remove(user.userId, id);
   }
 }

@@ -3,18 +3,16 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Plan } from '@prisma/client';
+import { CampaignStatus, LeadStatus } from '@prisma/client';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { PrismaService } from '../../common/services/prisma.service';
-
-// Price per lead based on plan
-const PRICE_PER_LEAD_MAP = {
-  [Plan.PAY_PER_LEAD]: 60,
-  [Plan.STARTER]: 30,
-  [Plan.GROWTH]: 25,
-  [Plan.SCALE]: 20,
-};
+import {
+  PaginationDto,
+  PaginatedResult,
+  createPaginatedResult,
+} from '../../common/dto/pagination.dto';
+import { getPricePerLead } from '../../common/constants/pricing';
 
 @Injectable()
 export class CampaignsService {
@@ -30,7 +28,7 @@ export class CampaignsService {
       throw new NotFoundException('Customer not found');
     }
 
-    const pricePerLead = PRICE_PER_LEAD_MAP[customer.plan];
+    const pricePerLead = getPricePerLead(customer.plan);
 
     // Create campaign
     const campaign = await this.prisma.campaign.create({
@@ -42,7 +40,7 @@ export class CampaignsService {
         budget: createCampaignDto.budget,
         maxLeads: createCampaignDto.maxLeads,
         pricePerLead,
-        status: 'DRAFT',
+        status: CampaignStatus.DRAFT,
       },
       include: {
         emailSequences: true,
@@ -52,19 +50,30 @@ export class CampaignsService {
     return campaign;
   }
 
-  async findAll(customerId: string) {
-    const campaigns = await this.prisma.campaign.findMany({
-      where: { customerId },
-      include: {
-        emailSequences: true,
-        _count: {
-          select: { leads: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(
+    customerId: string,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
 
-    return campaigns;
+    const [campaigns, total] = await Promise.all([
+      this.prisma.campaign.findMany({
+        where: { customerId },
+        include: {
+          emailSequences: true,
+          _count: {
+            select: { leads: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.campaign.count({ where: { customerId } }),
+    ]);
+
+    return createPaginatedResult(campaigns, total, page, limit);
   }
 
   async findOne(customerId: string, id: string) {
@@ -106,7 +115,7 @@ export class CampaignsService {
 
     // Don't allow status changes to ACTIVE if no email sequences
     if (
-      updateCampaignDto.status === 'ACTIVE' &&
+      updateCampaignDto.status === CampaignStatus.ACTIVE &&
       existing.emailSequences.length === 0
     ) {
       throw new ForbiddenException(
@@ -144,7 +153,7 @@ export class CampaignsService {
 
     if (
       campaign &&
-      (campaign.status === 'ACTIVE' || campaign.status === 'WARMUP')
+      (campaign.status === CampaignStatus.ACTIVE || campaign.status === CampaignStatus.WARMUP)
     ) {
       throw new ForbiddenException(
         'Cannot delete active or warming campaign. Please pause or cancel first.',
@@ -184,61 +193,72 @@ export class CampaignsService {
   }
 
   async getDashboardStats(customerId: string) {
-    // Get total campaigns count
-    const totalCampaigns = await this.prisma.campaign.count({
-      where: { customerId },
-    });
+    // Execute all queries in parallel for better performance
+    const [
+      totalCampaigns,
+      recentCampaigns,
+      activeLeads,
+      qualifiedLeads,
+      revenueResult,
+    ] = await Promise.all([
+      // Get total campaigns count
+      this.prisma.campaign.count({
+        where: { customerId },
+      }),
 
-    // Get recent campaigns (last 5)
-    const recentCampaigns = await this.prisma.campaign.findMany({
-      where: { customerId },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        totalContacted: true,
-        totalQualified: true,
-        _count: {
-          select: { leads: true },
+      // Get recent campaigns (last 5)
+      this.prisma.campaign.findMany({
+        where: { customerId },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          totalContacted: true,
+          totalQualified: true,
+          _count: {
+            select: { leads: true },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
 
-    // Get active leads count (CONTACTED, OPENED, REPLIED, INTERESTED)
-    const activeLeads = await this.prisma.lead.count({
-      where: {
-        customerId,
-        status: {
-          in: ['CONTACTED', 'OPENED', 'REPLIED', 'INTERESTED'],
+      // Get active leads count (CONTACTED, OPENED, REPLIED, INTERESTED)
+      this.prisma.lead.count({
+        where: {
+          customerId,
+          status: {
+            in: [
+              LeadStatus.CONTACTED,
+              LeadStatus.OPENED,
+              LeadStatus.REPLIED,
+              LeadStatus.INTERESTED,
+            ],
+          },
         },
-      },
-    });
+      }),
 
-    // Get qualified leads count
-    const qualifiedLeads = await this.prisma.lead.count({
-      where: {
-        customerId,
-        status: 'QUALIFIED',
-      },
-    });
+      // Get qualified leads count
+      this.prisma.lead.count({
+        where: {
+          customerId,
+          status: LeadStatus.QUALIFIED,
+        },
+      }),
 
-    // Calculate revenue (sum of paid amounts)
-    const paidLeads = await this.prisma.lead.findMany({
-      where: {
-        customerId,
-        status: 'PAID',
-      },
-      select: {
-        paidAmount: true,
-      },
-    });
+      // Calculate revenue using aggregate instead of loading all records
+      this.prisma.lead.aggregate({
+        where: {
+          customerId,
+          status: LeadStatus.PAID,
+        },
+        _sum: {
+          paidAmount: true,
+        },
+      }),
+    ]);
 
-    const revenue = paidLeads.reduce(
-      (sum, lead) => sum + (lead.paidAmount || 0),
-      0,
-    );
+    const revenue = revenueResult._sum.paidAmount || 0;
 
     // Calculate growth percentages (mock for now, would need historical data)
     return {
