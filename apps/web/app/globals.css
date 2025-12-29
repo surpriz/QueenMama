@@ -29,6 +29,27 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Vibrant gradient colors */
+    --gradient-purple-start: 262 83% 58%;
+    --gradient-purple-end: 250 89% 65%;
+    --gradient-blue-start: 217 91% 60%;
+    --gradient-blue-end: 199 89% 48%;
+    --gradient-pink-start: 330 81% 60%;
+    --gradient-orange-start: 25 95% 53%;
+
+    /* Accent colors */
+    --accent-cyan: 180 77% 47%;
+    --accent-lime: 84 81% 44%;
+
+    /* Glass effect */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 100% / 0.2;
+
+    /* Glow effects */
+    --glow-purple: 262 83% 58% / 0.3;
+    --glow-blue: 217 91% 60% / 0.3;
+    --glow-green: 142 71% 45% / 0.3;
   }
 
   .dark {
@@ -56,6 +77,10 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Glass effect dark mode */
+    --glass-bg: 222 84% 10% / 0.7;
+    --glass-border: 222 84% 20% / 0.3;
   }
 }
 
@@ -65,5 +90,43 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-purple-600 via-pink-500 to-blue-500 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-purple-blue {
+    @apply bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-blue-cyan {
+    @apply bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent;
+  }
+
+  .bg-mesh-gradient {
+    background-image:
+      radial-gradient(at 40% 20%, hsla(262, 83%, 58%, 0.3) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(217, 91%, 60%, 0.3) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(330, 81%, 60%, 0.2) 0px, transparent 50%),
+      radial-gradient(at 80% 80%, hsla(199, 89%, 48%, 0.2) 0px, transparent 50%);
+  }
+
+  .glass {
+    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-lg border border-white/20;
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 30px -5px hsl(262 83% 58% / 0.3);
+  }
+
+  .glow-blue {
+    box-shadow: 0 0 30px -5px hsl(217 91% 60% / 0.3);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 30px -5px hsl(142 71% 45% / 0.3);
   }
 }
