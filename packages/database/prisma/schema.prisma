@@ -37,6 +37,11 @@ model Customer {
   status        AccountStatus   @default(ACTIVE)
   isVerified    Boolean         @default(false)
 
+  // Email verification
+  verificationToken           String?   @unique
+  verificationTokenExpiresAt  DateTime?
+  emailVerifiedAt             DateTime?
+
   // Stripe (pour paiements one-time uniquement)
   stripeCustomerId String?  @unique
 

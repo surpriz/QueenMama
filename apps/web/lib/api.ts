@@ -16,10 +16,19 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Unauthorized - clear user data and redirect to login
-      // Cookie will be cleared by backend or expired automatically
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Don't redirect if we're on auth pages (login, register, verify-email)
+      // Otherwise, the error message won't be displayed
+      const isAuthPage = typeof window !== 'undefined' && (
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/register' ||
+        window.location.pathname.startsWith('/verify-email')
+      );
+
+      if (!isAuthPage) {
+        // Unauthorized on protected page - clear user data and redirect to login
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

@@ -3,10 +3,20 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import { AppModule } from './app.module';
+
+// Load environment variables before anything else (override: true to force reload)
+dotenv.config({ path: path.resolve(__dirname, '../.env'), override: true });
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Log CORS origin for debugging
+  const corsOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
+  logger.log(`CORS Origin configured: ${corsOrigin}`);
+
   const app = await NestFactory.create(AppModule);
 
   // Cookie parser for httpOnly cookies
@@ -15,7 +25,7 @@ async function bootstrap() {
   // Security
   app.use(helmet());
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3002',
+    origin: corsOrigin,
     credentials: true,
   });
 

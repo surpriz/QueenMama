@@ -5,6 +5,8 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -19,16 +21,12 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({ status: 201, description: 'User successfully registered' })
+  @ApiResponse({ status: 201, description: 'User successfully registered, verification email sent' })
   @ApiResponse({ status: 409, description: 'Email already exists' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
-  async register(
-    @Body() registerDto: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.register(registerDto);
-    res.cookie('access_token', result.access_token, this.authService.getCookieOptions());
-    return { user: result.user };
+  async register(@Body() registerDto: RegisterDto) {
+    // No cookie set - user needs to verify email first
+    return this.authService.register(registerDto);
   }
 
   @Public()
@@ -37,6 +35,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({ status: 200, description: 'User successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'Email not verified or account blocked' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async login(
     @Body() loginDto: LoginDto,
@@ -45,6 +44,28 @@ export class AuthController {
     const result = await this.authService.login(loginDto);
     res.cookie('access_token', result.access_token, this.authService.getCookieOptions());
     return { user: result.user };
+  }
+
+  @Public()
+  @Post('verify-email')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  @ApiOperation({ summary: 'Verify user email with token' })
+  @ApiResponse({ status: 200, description: 'Email successfully verified' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    return this.authService.verifyEmail(verifyEmailDto.token);
+  }
+
+  @Public()
+  @Post('resend-verification')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
+  @ApiOperation({ summary: 'Resend verification email' })
+  @ApiResponse({ status: 200, description: 'Verification email sent if account exists' })
+  @ApiResponse({ status: 400, description: 'Email already verified' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  async resendVerification(@Body() resendDto: ResendVerificationDto) {
+    return this.authService.resendVerificationEmail(resendDto.email);
   }
 
   @UseGuards(JwtAuthGuard)
