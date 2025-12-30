@@ -15,6 +15,8 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { EmailService } from '../emails/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -243,6 +245,82 @@ export class AuthService {
 
     return {
       message: 'Si cette adresse email existe, un email de verification a ete envoye.',
+    };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    // Find user
+    const user = await this.prisma.customer.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) {
+      // Don't reveal if email exists or not (security: prevent email enumeration)
+      return {
+        message: 'Si cette adresse email existe, un email de reinitialisation a ete envoye.',
+      };
+    }
+
+    // Generate password reset token
+    const passwordResetToken = this.generateVerificationToken();
+    const passwordResetTokenExpiresAt = this.getTokenExpiry();
+
+    // Update user with reset token
+    await this.prisma.customer.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken,
+        passwordResetTokenExpiresAt,
+      },
+    });
+
+    // Send password reset email
+    try {
+      await this.emailService.sendPasswordResetEmail(
+        user.email,
+        passwordResetToken,
+        user.firstName || undefined,
+      );
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      throw new BadRequestException('Erreur lors de l\'envoi de l\'email');
+    }
+
+    return {
+      message: 'Si cette adresse email existe, un email de reinitialisation a ete envoye.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    // Find user with this token
+    const user = await this.prisma.customer.findUnique({
+      where: { passwordResetToken: dto.token },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token invalide');
+    }
+
+    // Check if token has expired
+    if (user.passwordResetTokenExpiresAt && user.passwordResetTokenExpiresAt < new Date()) {
+      throw new BadRequestException('Le token a expire. Veuillez demander un nouveau lien.');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    // Update user password and clear reset token
+    await this.prisma.customer.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+      },
+    });
+
+    return {
+      message: 'Mot de passe reinitialise avec succes',
     };
   }
 

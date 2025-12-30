@@ -255,3 +255,15 @@ export function useDeleteLead() {
     },
   });
 }
+
+// ============= SES MONITORING =============
+
+// Get SES metrics
+export function useSesMetrics() {
+  return useQuery({
+    queryKey: ['admin', 'ses-metrics'],
+    queryFn: () => adminApi.getSesMetrics(),
+    staleTime: STALE_TIME.STATS,
+    refetchInterval: 60 * 1000, // Refresh every minute
+  });
+}

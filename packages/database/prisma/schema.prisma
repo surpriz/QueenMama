@@ -42,6 +42,10 @@ model Customer {
   verificationTokenExpiresAt  DateTime?
   emailVerifiedAt             DateTime?
 
+  // Password reset
+  passwordResetToken          String?   @unique
+  passwordResetTokenExpiresAt DateTime?
+
   // Stripe (pour paiements one-time uniquement)
   stripeCustomerId String?  @unique
 

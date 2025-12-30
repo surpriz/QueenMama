@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { getVerificationEmailTemplate } from './templates/verification';
+import { getPasswordResetEmailTemplate } from './templates/password-reset';
 
 @Injectable()
 export class EmailService {
@@ -73,6 +74,51 @@ export class EmailService {
       return true;
     } catch (error) {
       this.logger.error(`Failed to send verification email to ${email}`, error);
+      throw error;
+    }
+  }
+
+  async sendPasswordResetEmail(
+    email: string,
+    token: string,
+    firstName?: string,
+  ): Promise<boolean> {
+    const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
+    const { subject, html, text } = getPasswordResetEmailTemplate(
+      firstName || 'Utilisateur',
+      resetUrl,
+    );
+
+    try {
+      const command = new SendEmailCommand({
+        Source: this.fromEmail,
+        Destination: {
+          ToAddresses: [email],
+        },
+        Message: {
+          Subject: {
+            Charset: 'UTF-8',
+            Data: subject,
+          },
+          Body: {
+            Html: {
+              Charset: 'UTF-8',
+              Data: html,
+            },
+            Text: {
+              Charset: 'UTF-8',
+              Data: text,
+            },
+          },
+        },
+      });
+
+      const response = await this.sesClient.send(command);
+      this.logger.log(`Password reset email sent to ${email} from ${this.fromEmail}`);
+      this.logger.log(`  - SES MessageId: ${response.MessageId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${email}`, error);
       throw error;
     }
   }

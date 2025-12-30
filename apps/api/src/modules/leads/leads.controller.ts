@@ -21,7 +21,7 @@ export class LeadsController {
     @Query() pagination: PaginationDto,
     @Req() req: Request,
   ) {
-    const customerId = (req.user as AuthenticatedUser).userId;
+    const customerId = (req.user as AuthenticatedUser).id;
     return this.leadsService.getAllLeads(customerId, pagination);
   }
 
@@ -31,7 +31,7 @@ export class LeadsController {
   @ApiResponse({ status: 403, description: 'Access forbidden' })
   @ApiResponse({ status: 404, description: 'Lead not found' })
   async getLeadById(@Param('id') id: string, @Req() req: Request) {
-    const customerId = (req.user as AuthenticatedUser).userId;
+    const customerId = (req.user as AuthenticatedUser).id;
     return this.leadsService.getLeadById(id, customerId);
   }
 
@@ -43,7 +43,7 @@ export class LeadsController {
   @ApiResponse({ status: 403, description: 'Access forbidden' })
   @ApiResponse({ status: 404, description: 'Lead not found' })
   async unlockLead(@Param('id') id: string, @Req() req: Request) {
-    const customerId = (req.user as AuthenticatedUser).userId;
+    const customerId = (req.user as AuthenticatedUser).id;
     return this.leadsService.unlockLead(id, customerId);
   }
 }

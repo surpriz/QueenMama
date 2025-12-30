@@ -196,7 +196,7 @@ export interface DashboardStats {
 
 // Campaigns
 export const campaignsApi = {
-  getAll: () => api.get<Campaign[]>('/campaigns').then((res) => res.data),
+  getAll: () => api.get<{ data: Campaign[]; meta: any }>('/campaigns').then((res) => res.data.data),
 
   getOne: (id: string) =>
     api.get<Campaign>(`/campaigns/${id}`).then((res) => res.data),
@@ -319,7 +319,7 @@ export const adminApi = {
   // User management
   getStats: () => api.get<AdminStats>('/admin/stats').then((res) => res.data),
 
-  getAllUsers: () => api.get<AdminUser[]>('/admin/users').then((res) => res.data),
+  getAllUsers: () => api.get<{ data: AdminUser[]; meta: any }>('/admin/users').then((res) => res.data.data),
 
   getUser: (id: string) =>
     api.get<AdminUser>(`/admin/users/${id}`).then((res) => res.data),
@@ -341,7 +341,7 @@ export const adminApi = {
 
   // Campaign management
   getAllCampaigns: () =>
-    api.get<AdminCampaign[]>('/admin/campaigns').then((res) => res.data),
+    api.get<{ data: AdminCampaign[]; meta: any }>('/admin/campaigns').then((res) => res.data.data),
 
   getCampaign: (id: string) =>
     api.get<AdminCampaign>(`/admin/campaigns/${id}`).then((res) => res.data),
@@ -367,7 +367,7 @@ export const adminApi = {
 
   // Lead management
   getAllLeads: () =>
-    api.get<Lead[]>('/admin/leads').then((res) => res.data),
+    api.get<{ data: Lead[]; meta: any }>('/admin/leads').then((res) => res.data.data),
 
   getLead: (id: string) =>
     api.get<Lead>(`/admin/leads/${id}`).then((res) => res.data),
@@ -380,7 +380,40 @@ export const adminApi = {
 
   deleteLead: (id: string) =>
     api.delete<{ message: string }>(`/admin/leads/${id}`).then((res) => res.data),
+
+  // SES Monitoring
+  getSesMetrics: () =>
+    api.get<SESMetrics>('/admin/ses-metrics').then((res) => res.data),
 };
+
+// SES Monitoring Types
+export interface SESMetrics {
+  status: 'healthy' | 'warning' | 'critical';
+  region: string;
+  sendVolume: {
+    last24Hours: number;
+    last7Days: number;
+    last30Days: number;
+  };
+  deliverabilityMetrics: {
+    deliveryRate: number;
+    bounceRate: number;
+    complaintRate: number;
+  };
+  quotas: {
+    maxSendRate: number;
+    dailyQuota: number;
+    sentLast24Hours: number;
+    quotaUsagePercent: number;
+  };
+  identities: Array<{
+    identity: string;
+    type: 'Domain' | 'Email';
+    status: 'Verified' | 'Pending' | 'Failed';
+    dkimVerified: boolean;
+  }>;
+  lastUpdated: string;
+}
 
 // Leads (customer)
 export interface CreateLeadDto {
@@ -404,7 +437,7 @@ export interface CreateLeadDto {
 export interface UpdateLeadDto extends Partial<CreateLeadDto> {}
 
 export const leadsApi = {
-  getAll: () => api.get<Lead[]>('/leads').then((res) => res.data),
+  getAll: () => api.get<{ data: Lead[]; meta: any }>('/leads').then((res) => res.data.data),
 
   getOne: (id: string) =>
     api.get<Lead>(`/leads/${id}`).then((res) => res.data),

@@ -7,6 +7,7 @@ import { GradientText } from '@/components/landing/GradientText';
 import { GlassCard } from '@/components/landing/GlassCard';
 import { DashboardMockup } from '@/components/landing/DashboardMockup';
 import { MetricCard } from '@/components/landing/MetricCard';
+import { BackToTop } from '@/components/ui/BackToTop';
 import {
   ArrowRight,
   Target,
@@ -642,6 +643,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      <BackToTop />
     </div>
   );
 }

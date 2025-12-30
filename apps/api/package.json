@@ -18,6 +18,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.958.0",
     "@aws-sdk/client-ses": "^3.958.0",
     "@clerk/backend": "^1.0.0",
     "@nestjs/common": "^10.3.0",

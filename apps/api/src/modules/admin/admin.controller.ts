@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { SesMonitoringService } from './ses-monitoring.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from './guards/admin.guard';
 import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
@@ -26,13 +27,23 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, AdminGuard)
 @ApiBearerAuth()
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly sesMonitoringService: SesMonitoringService,
+  ) {}
 
   @Get('stats')
   @ApiOperation({ summary: 'Get admin statistics' })
   @ApiResponse({ status: 200, description: 'Admin statistics' })
   async getStats() {
     return this.adminService.getStats();
+  }
+
+  @Get('ses-metrics')
+  @ApiOperation({ summary: 'Get AWS SES email monitoring metrics' })
+  @ApiResponse({ status: 200, description: 'SES monitoring metrics including send volume, deliverability, quotas, and identities' })
+  async getSesMetrics() {
+    return this.sesMonitoringService.getMetrics();
   }
 
   @Get('users')

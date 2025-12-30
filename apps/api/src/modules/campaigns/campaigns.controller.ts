@@ -41,7 +41,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() createCampaignDto: CreateCampaignDto,
   ) {
-    return this.campaignsService.create(user.userId, createCampaignDto);
+    return this.campaignsService.create(user.id, createCampaignDto);
   }
 
   @Get('dashboard-stats')
@@ -51,7 +51,7 @@ export class CampaignsController {
     description: 'Dashboard statistics',
   })
   getDashboardStats(@CurrentUser() user: AuthenticatedUser) {
-    return this.campaignsService.getDashboardStats(user.userId);
+    return this.campaignsService.getDashboardStats(user.id);
   }
 
   @Get()
@@ -64,7 +64,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthenticatedUser,
     @Query() pagination: PaginationDto,
   ) {
-    return this.campaignsService.findAll(user.userId, pagination);
+    return this.campaignsService.findAll(user.id, pagination);
   }
 
   @Get(':id')
@@ -76,7 +76,7 @@ export class CampaignsController {
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   @ApiResponse({ status: 403, description: 'Access denied' })
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.campaignsService.findOne(user.userId, id);
+    return this.campaignsService.findOne(user.id, id);
   }
 
   @Get(':id/stats')
@@ -86,7 +86,7 @@ export class CampaignsController {
     description: 'Campaign statistics',
   })
   getStats(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.campaignsService.getStats(user.userId, id);
+    return this.campaignsService.getStats(user.id, id);
   }
 
   @Patch(':id')
@@ -102,7 +102,7 @@ export class CampaignsController {
     @Param('id') id: string,
     @Body() updateCampaignDto: UpdateCampaignDto,
   ) {
-    return this.campaignsService.update(user.userId, id, updateCampaignDto);
+    return this.campaignsService.update(user.id, id, updateCampaignDto);
   }
 
   @Delete(':id')
@@ -114,6 +114,6 @@ export class CampaignsController {
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   @ApiResponse({ status: 403, description: 'Access denied or cannot delete active campaign' })
   remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.campaignsService.remove(user.userId, id);
+    return this.campaignsService.remove(user.id, id);
   }
 }
