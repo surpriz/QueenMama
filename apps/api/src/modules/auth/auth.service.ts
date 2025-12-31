@@ -91,6 +91,7 @@ export class AuthService {
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
         company: registerDto.company,
+        phone: registerDto.phone,
         isVerified: false,
         verificationToken,
         verificationTokenExpiresAt,
@@ -339,6 +340,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       company: user.company,
+      phone: user.phone,
       role: user.role,
       isVerified: user.isVerified,
     };

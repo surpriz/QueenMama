@@ -31,6 +31,7 @@ model Customer {
   firstName String?
   lastName  String?
   company   String?
+  phone     String?  // Optional international phone number
 
   // Account management
   role          UserRole        @default(USER)

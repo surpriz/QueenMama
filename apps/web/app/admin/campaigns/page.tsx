@@ -173,6 +173,7 @@ export default function AdminCampaignsPage() {
                       <TableHead>Customer</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Budget</TableHead>
+                      <TableHead className="text-right">Prix/lead</TableHead>
                       <TableHead>Contacted</TableHead>
                       <TableHead>Qualified</TableHead>
                       <TableHead>Created</TableHead>
@@ -215,6 +216,19 @@ export default function AdminCampaignsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>€{campaign.budget.toFixed(0)}</TableCell>
+                          <TableCell className="text-right">
+                            {campaign.pricePerLead !== null ? (
+                              <span className="font-medium">
+                                €{Number.isInteger(campaign.pricePerLead)
+                                  ? campaign.pricePerLead
+                                  : campaign.pricePerLead.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-orange-600 italic text-sm">
+                                En attente
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>{campaign.totalContacted}</TableCell>
                           <TableCell>
                             <span className="text-green-600 font-medium">

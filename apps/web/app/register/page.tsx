@@ -24,6 +24,7 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
     company: '',
+    phone: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,6 +35,15 @@ export default function RegisterPage() {
     if (formData.password !== formData.confirmPassword) {
       setError('Les mots de passe ne correspondent pas');
       return;
+    }
+
+    // Validate phone format if provided
+    if (formData.phone && formData.phone.trim() !== '') {
+      const phoneRegex = /^\+\d{1,3}\s?\d{1,14}$/;
+      if (!phoneRegex.test(formData.phone.trim())) {
+        setError('Format de téléphone invalide. Utilisez le format international (+33 6 12 34 56 78)');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -302,6 +312,24 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="h-11 bg-background/50 border-white/10 focus:border-purple-500/50 transition-colors"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  Téléphone <span className="text-muted-foreground text-xs">(optionnel)</span>
+                </Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="+33 6 12 34 56 78"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="h-11 bg-background/50 border-white/10 focus:border-purple-500/50 transition-colors"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Format international avec indicatif pays (ex: +33 6 12 34 56 78)
+                </p>
               </div>
 
               <div className="space-y-2">

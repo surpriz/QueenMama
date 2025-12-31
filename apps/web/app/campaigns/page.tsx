@@ -119,6 +119,7 @@ export default function CampaignsPage() {
                     <TableHead className="text-right text-muted-foreground">Contacted</TableHead>
                     <TableHead className="text-right text-muted-foreground">Qualified</TableHead>
                     <TableHead className="text-right text-muted-foreground">Budget</TableHead>
+                    <TableHead className="text-right text-muted-foreground">Prix/lead</TableHead>
                     <TableHead className="text-muted-foreground">Created</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -161,6 +162,19 @@ export default function CampaignsPage() {
                           {campaign.totalQualified}
                         </TableCell>
                         <TableCell className="text-right">€{campaign.budget}</TableCell>
+                        <TableCell className="text-right">
+                          {campaign.pricePerLead !== null ? (
+                            <span className="font-medium">
+                              €{Number.isInteger(campaign.pricePerLead)
+                                ? campaign.pricePerLead
+                                : campaign.pricePerLead.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-orange-400 italic text-sm">
+                              En attente
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(campaign.createdAt).toLocaleDateString()}
                         </TableCell>
