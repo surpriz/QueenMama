@@ -886,4 +886,356 @@ export class AdminService {
       interaction,
     };
   }
+
+  // ============= ADVANCED STATISTICS =============
+
+  /**
+   * Get revenue statistics by period (weekly or monthly)
+   */
+  async getRevenueStats(period: 'weekly' | 'monthly' = 'monthly') {
+    const now = new Date();
+    const dataPoints: { period: string; revenue: number; leadsCount: number }[] = [];
+
+    // Determine number of periods and interval
+    const periodsCount = period === 'weekly' ? 12 : 6; // 12 weeks or 6 months
+
+    for (let i = periodsCount - 1; i >= 0; i--) {
+      let startDate: Date;
+      let endDate: Date;
+      let periodLabel: string;
+
+      if (period === 'weekly') {
+        // Calculate week boundaries
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - (i + 1) * 7);
+        startDate.setHours(0, 0, 0, 0);
+
+        endDate = new Date(now);
+        endDate.setDate(now.getDate() - i * 7);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Format: "Sem. 48" (Week 48)
+        const weekNum = Math.ceil((startDate.getDate() + new Date(startDate.getFullYear(), startDate.getMonth(), 1).getDay()) / 7);
+        periodLabel = `Sem. ${weekNum}`;
+      } else {
+        // Calculate month boundaries
+        startDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+
+        // Format: "Jan 2025"
+        periodLabel = startDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+      }
+
+      // Get paid leads for this period
+      const paidLeads = await this.prisma.lead.findMany({
+        where: {
+          status: LeadStatus.PAID,
+          revealedAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        select: {
+          paidAmount: true,
+        },
+      });
+
+      const revenue = paidLeads.reduce((sum, lead) => sum + (lead.paidAmount || 0), 0);
+      const leadsCount = paidLeads.length;
+
+      dataPoints.push({
+        period: periodLabel,
+        revenue,
+        leadsCount,
+      });
+    }
+
+    // Calculate totals and growth
+    const totalRevenue = dataPoints.reduce((sum, d) => sum + d.revenue, 0);
+    const totalLeads = dataPoints.reduce((sum, d) => sum + d.leadsCount, 0);
+
+    // Calculate growth (compare last period to previous)
+    const lastPeriodRevenue = dataPoints[dataPoints.length - 1]?.revenue || 0;
+    const previousPeriodRevenue = dataPoints[dataPoints.length - 2]?.revenue || 0;
+    const growth = previousPeriodRevenue > 0
+      ? ((lastPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
+      : 0;
+
+    return {
+      period,
+      data: dataPoints,
+      total: totalRevenue,
+      totalLeads,
+      growth: Math.round(growth * 10) / 10, // Round to 1 decimal
+    };
+  }
+
+  /**
+   * Get lead funnel statistics (conversion rates by status)
+   */
+  async getLeadFunnelStats() {
+    // Get counts for each status
+    const statusCounts = await this.prisma.lead.groupBy({
+      by: ['status'],
+      _count: true,
+    });
+
+    // Convert to object for easy access
+    const counts: Record<string, number> = {};
+    statusCounts.forEach((item) => {
+      counts[item.status] = item._count;
+    });
+
+    // Define funnel stages in order
+    const funnel = [
+      { status: 'CONTACTED', label: 'Contactés', count: counts['CONTACTED'] || 0 },
+      { status: 'OPENED', label: 'Ouverts', count: counts['OPENED'] || 0 },
+      { status: 'REPLIED', label: 'Répondus', count: counts['REPLIED'] || 0 },
+      { status: 'INTERESTED', label: 'Intéressés', count: counts['INTERESTED'] || 0 },
+      { status: 'QUALIFIED', label: 'Qualifiés', count: counts['QUALIFIED'] || 0 },
+      { status: 'PAID', label: 'Payés', count: counts['PAID'] || 0 },
+    ];
+
+    // Calculate conversion rates between stages
+    const funnelWithRates = funnel.map((stage, index) => {
+      const previousCount = index > 0 ? funnel[index - 1].count : stage.count;
+      const conversionRate = previousCount > 0
+        ? Math.round((stage.count / previousCount) * 100 * 10) / 10
+        : 0;
+
+      return {
+        ...stage,
+        conversionRate,
+      };
+    });
+
+    // Total leads
+    const totalLeads = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+    // Also include negative statuses
+    const otherStats = {
+      notInterested: counts['NOT_INTERESTED'] || 0,
+      bounced: counts['BOUNCED'] || 0,
+      unsubscribed: counts['UNSUBSCRIBED'] || 0,
+    };
+
+    return {
+      funnel: funnelWithRates,
+      totalLeads,
+      otherStats,
+    };
+  }
+
+  /**
+   * Get campaign status distribution
+   */
+  async getCampaignStatusDistribution() {
+    const statusCounts = await this.prisma.campaign.groupBy({
+      by: ['status'],
+      _count: true,
+    });
+
+    const distribution = statusCounts.map((item) => {
+      const labels: Record<string, string> = {
+        DRAFT: 'Brouillon',
+        PENDING_REVIEW: 'En attente',
+        WARMUP: 'Warmup',
+        ACTIVE: 'Active',
+        PAUSED: 'En pause',
+        COMPLETED: 'Terminée',
+        CANCELED: 'Annulée',
+      };
+
+      const colors: Record<string, string> = {
+        DRAFT: '#6b7280',
+        PENDING_REVIEW: '#eab308',
+        WARMUP: '#3b82f6',
+        ACTIVE: '#22c55e',
+        PAUSED: '#f97316',
+        COMPLETED: '#a855f7',
+        CANCELED: '#ef4444',
+      };
+
+      return {
+        status: item.status,
+        label: labels[item.status] || item.status,
+        count: item._count,
+        color: colors[item.status] || '#6b7280',
+      };
+    });
+
+    const total = distribution.reduce((sum, d) => sum + d.count, 0);
+
+    return {
+      distribution,
+      total,
+    };
+  }
+
+  /**
+   * Get recent activity across the platform
+   */
+  async getRecentActivity(limit: number = 10) {
+    // Get recent campaigns
+    const recentCampaigns = await this.prisma.campaign.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        startedAt: true,
+        customer: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            company: true,
+          },
+        },
+      },
+    });
+
+    // Get recent leads (qualified or paid)
+    const recentLeads = await this.prisma.lead.findMany({
+      where: {
+        status: {
+          in: [LeadStatus.QUALIFIED, LeadStatus.PAID, LeadStatus.INTERESTED],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        company: true,
+        status: true,
+        createdAt: true,
+        campaign: {
+          select: {
+            name: true,
+            customer: {
+              select: {
+                firstName: true,
+                lastName: true,
+                company: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Get recent payments
+    const recentPayments = await this.prisma.payment.findMany({
+      where: {
+        status: 'SUCCEEDED',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        type: true,
+        amount: true,
+        createdAt: true,
+        customer: {
+          select: {
+            firstName: true,
+            lastName: true,
+            company: true,
+          },
+        },
+      },
+    });
+
+    // Transform and combine activities
+    type ActivityItem = {
+      id: string;
+      type: 'campaign_created' | 'campaign_approved' | 'lead_qualified' | 'lead_paid' | 'payment_received';
+      description: string;
+      timestamp: Date;
+      metadata: Record<string, any>;
+    };
+
+    const activities: ActivityItem[] = [];
+
+    // Add campaign activities
+    recentCampaigns.forEach((campaign) => {
+      const customerName = campaign.customer.firstName && campaign.customer.lastName
+        ? `${campaign.customer.firstName} ${campaign.customer.lastName}`
+        : campaign.customer.company || campaign.customer.email;
+
+      if (campaign.startedAt) {
+        activities.push({
+          id: `campaign-approved-${campaign.id}`,
+          type: 'campaign_approved',
+          description: `Campagne "${campaign.name}" approuvée pour ${customerName}`,
+          timestamp: campaign.startedAt,
+          metadata: { campaignId: campaign.id, campaignName: campaign.name, customerName },
+        });
+      } else {
+        activities.push({
+          id: `campaign-created-${campaign.id}`,
+          type: 'campaign_created',
+          description: `Nouvelle campagne "${campaign.name}" créée par ${customerName}`,
+          timestamp: campaign.createdAt,
+          metadata: { campaignId: campaign.id, campaignName: campaign.name, customerName },
+        });
+      }
+    });
+
+    // Add lead activities
+    recentLeads.forEach((lead) => {
+      const leadName = `${lead.firstName} ${lead.lastName}`;
+      const campaignName = lead.campaign.name;
+      const customerName = lead.campaign.customer.firstName && lead.campaign.customer.lastName
+        ? `${lead.campaign.customer.firstName} ${lead.campaign.customer.lastName}`
+        : lead.campaign.customer.company || 'Client';
+
+      if (lead.status === LeadStatus.PAID) {
+        activities.push({
+          id: `lead-paid-${lead.id}`,
+          type: 'lead_paid',
+          description: `Lead "${leadName}" (${lead.company}) payé - Campagne ${campaignName}`,
+          timestamp: lead.createdAt,
+          metadata: { leadId: lead.id, leadName, campaignName, customerName },
+        });
+      } else if (lead.status === LeadStatus.QUALIFIED) {
+        activities.push({
+          id: `lead-qualified-${lead.id}`,
+          type: 'lead_qualified',
+          description: `Lead "${leadName}" (${lead.company}) qualifié - Campagne ${campaignName}`,
+          timestamp: lead.createdAt,
+          metadata: { leadId: lead.id, leadName, campaignName, customerName },
+        });
+      }
+    });
+
+    // Add payment activities
+    recentPayments.forEach((payment) => {
+      const customerName = payment.customer.firstName && payment.customer.lastName
+        ? `${payment.customer.firstName} ${payment.customer.lastName}`
+        : payment.customer.company || 'Client';
+
+      activities.push({
+        id: `payment-${payment.id}`,
+        type: 'payment_received',
+        description: `Paiement de ${payment.amount}€ reçu de ${customerName}`,
+        timestamp: payment.createdAt,
+        metadata: { paymentId: payment.id, amount: payment.amount, customerName, type: payment.type },
+      });
+    });
+
+    // Sort by timestamp descending and limit
+    activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    const limitedActivities = activities.slice(0, limit);
+
+    return {
+      activities: limitedActivities,
+      total: limitedActivities.length,
+    };
+  }
 }

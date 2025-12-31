@@ -5,20 +5,23 @@ import { cn } from '@/lib/utils';
 interface GlassCardProps {
   children: React.ReactNode;
   className?: string;
-  glowColor?: 'purple' | 'blue' | 'green' | 'none';
+  glowColor?: 'purple' | 'blue' | 'green' | 'yellow' | 'none';
   hoverable?: boolean;
+  onClick?: () => void;
 }
 
 export function GlassCard({
   children,
   className,
   glowColor = 'none',
-  hoverable = false
+  hoverable = false,
+  onClick
 }: GlassCardProps) {
   const glowClasses = {
     purple: 'hover:shadow-glow-md',
     blue: 'hover:shadow-glow-blue',
     green: 'hover:shadow-glow-green',
+    yellow: 'hover:shadow-[0_0_30px_rgba(234,179,8,0.3)]',
     none: '',
   };
 
@@ -30,8 +33,10 @@ export function GlassCard({
         'border border-white/10 dark:border-white/5',
         hoverable && 'transition-all duration-300 hover:border-white/20 hover:-translate-y-1',
         hoverable && glowClasses[glowColor],
+        onClick && 'cursor-pointer',
         className
       )}
+      onClick={onClick}
     >
       {children}
     </div>

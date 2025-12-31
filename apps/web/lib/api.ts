@@ -384,6 +384,19 @@ export const adminApi = {
   // SES Monitoring
   getSesMetrics: () =>
     api.get<SESMetrics>('/admin/ses-metrics').then((res) => res.data),
+
+  // Advanced Statistics
+  getRevenueStats: (period: 'weekly' | 'monthly' = 'monthly') =>
+    api.get<RevenueStats>(`/admin/stats/revenue?period=${period}`).then((res) => res.data),
+
+  getLeadFunnelStats: () =>
+    api.get<LeadFunnelStats>('/admin/stats/lead-funnel').then((res) => res.data),
+
+  getCampaignDistribution: () =>
+    api.get<CampaignDistribution>('/admin/stats/campaign-distribution').then((res) => res.data),
+
+  getRecentActivity: (limit: number = 10) =>
+    api.get<ActivityItem[]>(`/admin/activity?limit=${limit}`).then((res) => res.data),
 };
 
 // SES Monitoring Types
@@ -413,6 +426,64 @@ export interface SESMetrics {
     dkimVerified: boolean;
   }>;
   lastUpdated: string;
+}
+
+// Revenue Stats Types
+export interface RevenueDataPoint {
+  period: string;
+  revenue: number;
+  leadsCount: number;
+}
+
+export interface RevenueStats {
+  data: RevenueDataPoint[];
+  total: number;
+  growth: number;
+  periodType: 'weekly' | 'monthly';
+}
+
+// Lead Funnel Types
+export interface LeadFunnelStats {
+  contacted: number;
+  opened: number;
+  replied: number;
+  interested: number;
+  qualified: number;
+  paid: number;
+  conversionRates: {
+    openRate: number;
+    replyRate: number;
+    interestRate: number;
+    qualificationRate: number;
+    paymentRate: number;
+  };
+}
+
+// Campaign Distribution Types
+export interface CampaignDistributionItem {
+  status: CampaignStatus;
+  count: number;
+  label: string;
+  color: string;
+}
+
+export type CampaignDistribution = CampaignDistributionItem[];
+
+// Activity Types
+export type ActivityType = 'campaign_created' | 'campaign_approved' | 'campaign_rejected' | 'lead_qualified' | 'lead_paid' | 'payment_received';
+
+export interface ActivityItem {
+  id: string;
+  type: ActivityType;
+  description: string;
+  timestamp: string;
+  metadata: {
+    entityId: string;
+    entityName?: string;
+    amount?: number;
+    customerEmail?: string;
+    [key: string]: any;
+  };
 }
 
 // Leads (customer)

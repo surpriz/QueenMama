@@ -1,7 +1,6 @@
 'use client';
 
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GlassCard } from '@/components/landing/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,22 +16,13 @@ import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { useCreateLead } from '@/hooks/use-admin';
 import { useAdminCampaigns } from '@/hooks/use-admin';
 import { CreateLeadDto, LeadStatus, Sentiment } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export default function NewLeadPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const createLead = useCreateLead();
   const { data: campaigns } = useAdminCampaigns();
-
-  // Redirect if not admin
-  useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
 
   // Form state
   const [formData, setFormData] = useState<CreateLeadDto>({
@@ -54,10 +44,6 @@ export default function NewLeadPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  if (!user || user.role !== 'ADMIN') {
-    return null;
-  }
 
   const handleChange = (
     field: keyof CreateLeadDto,
@@ -125,318 +111,328 @@ export default function NewLeadPage() {
   );
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-4xl">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/admin/leads')}
-            className="mb-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Leads
-          </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Lead</h1>
-          <p className="text-muted-foreground">
-            Manually add a lead that responded positively to an email campaign
-          </p>
-        </div>
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/admin/leads')}
+          className="mb-2 hover:bg-white/5"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Retour aux Leads
+        </Button>
+        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
+          Ajouter un Lead
+        </h1>
+        <p className="text-muted-foreground">
+          Ajoutez manuellement un lead ayant répondu positivement à une campagne
+        </p>
+      </div>
 
-        <form onSubmit={handleSubmit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Lead Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Campaign Selection */}
+      <form onSubmit={handleSubmit}>
+        <GlassCard className="p-6">
+          <h2 className="text-lg font-semibold mb-6">Informations du Lead</h2>
+          <div className="space-y-6">
+            {/* Campaign Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="campaignId">
+                Campagne <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.campaignId}
+                onValueChange={(value) => handleChange('campaignId', value)}
+              >
+                <SelectTrigger id="campaignId" className="bg-white/5 border-white/10">
+                  <SelectValue placeholder="Sélectionner une campagne" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  {activeCampaigns?.map((campaign) => (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.name} ({campaign.status})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.campaignId && (
+                <p className="text-sm text-red-500">{errors.campaignId}</p>
+              )}
+            </div>
+
+            {/* Contact Information */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="campaignId">
-                  Campaign <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.campaignId}
-                  onValueChange={(value) => handleChange('campaignId', value)}
-                >
-                  <SelectTrigger id="campaignId">
-                    <SelectValue placeholder="Select a campaign" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeCampaigns?.map((campaign) => (
-                      <SelectItem key={campaign.id} value={campaign.id}>
-                        {campaign.name} ({campaign.status})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.campaignId && (
-                  <p className="text-sm text-red-500">{errors.campaignId}</p>
-                )}
-              </div>
-
-              {/* Contact Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">
-                    First Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="firstName"
-                    value={formData.firstName}
-                    onChange={(e) => handleChange('firstName', e.target.value)}
-                    placeholder="John"
-                  />
-                  {errors.firstName && (
-                    <p className="text-sm text-red-500">{errors.firstName}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">
-                    Last Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="lastName"
-                    value={formData.lastName}
-                    onChange={(e) => handleChange('lastName', e.target.value)}
-                    placeholder="Doe"
-                  />
-                  {errors.lastName && (
-                    <p className="text-sm text-red-500">{errors.lastName}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email <span className="text-red-500">*</span>
+                <Label htmlFor="firstName">
+                  Prénom <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  placeholder="john.doe@company.com"
+                  id="firstName"
+                  value={formData.firstName}
+                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  placeholder="Jean"
+                  className="bg-white/5 border-white/10"
                 />
-                {errors.email && (
-                  <p className="text-sm text-red-500">{errors.email}</p>
+                {errors.firstName && (
+                  <p className="text-sm text-red-500">{errors.firstName}</p>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="company">
-                    Company <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="company"
-                    value={formData.company}
-                    onChange={(e) => handleChange('company', e.target.value)}
-                    placeholder="Acme Corp"
-                  />
-                  {errors.company && (
-                    <p className="text-sm text-red-500">{errors.company}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="title">
-                    Job Title <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => handleChange('title', e.target.value)}
-                    placeholder="Marketing Manager"
-                  />
-                  {errors.title && (
-                    <p className="text-sm text-red-500">{errors.title}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Optional Contact Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone (optional)</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                    placeholder="+33 6 12 34 56 78"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="linkedinUrl">LinkedIn URL (optional)</Label>
-                  <Input
-                    id="linkedinUrl"
-                    value={formData.linkedinUrl}
-                    onChange={(e) => handleChange('linkedinUrl', e.target.value)}
-                    placeholder="https://linkedin.com/in/johndoe"
-                  />
-                </div>
-              </div>
-
-              {/* Company Details */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="companySize">Company Size (optional)</Label>
-                  <Select
-                    value={formData.companySize}
-                    onValueChange={(value) => handleChange('companySize', value)}
-                  >
-                    <SelectTrigger id="companySize">
-                      <SelectValue placeholder="Select size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1-10">1-10</SelectItem>
-                      <SelectItem value="11-50">11-50</SelectItem>
-                      <SelectItem value="51-200">51-200</SelectItem>
-                      <SelectItem value="201-500">201-500</SelectItem>
-                      <SelectItem value="501-1000">501-1000</SelectItem>
-                      <SelectItem value="1000+">1000+</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="companyIndustry">Industry (optional)</Label>
-                  <Input
-                    id="companyIndustry"
-                    value={formData.companyIndustry}
-                    onChange={(e) =>
-                      handleChange('companyIndustry', e.target.value)
-                    }
-                    placeholder="Technology"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location (optional)</Label>
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={(e) => handleChange('location', e.target.value)}
-                    placeholder="Paris, France"
-                  />
-                </div>
-              </div>
-
-              {/* Lead Status & Quality */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="status">Lead Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) =>
-                      handleChange('status', value as LeadStatus)
-                    }
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CONTACTED">Contacted</SelectItem>
-                      <SelectItem value="OPENED">Opened</SelectItem>
-                      <SelectItem value="REPLIED">Replied</SelectItem>
-                      <SelectItem value="INTERESTED">Interested</SelectItem>
-                      <SelectItem value="QUALIFIED">Qualified</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sentiment">Sentiment</Label>
-                  <Select
-                    value={formData.sentiment}
-                    onValueChange={(value) =>
-                      handleChange('sentiment', value as Sentiment)
-                    }
-                  >
-                    <SelectTrigger id="sentiment">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="POSITIVE">😊 Positive</SelectItem>
-                      <SelectItem value="NEUTRAL">😐 Neutral</SelectItem>
-                      <SelectItem value="NEGATIVE">😞 Negative</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="qualityScore">
-                    Quality Score (0-100)
-                  </Label>
-                  <Input
-                    id="qualityScore"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.qualityScore || ''}
-                    onChange={(e) =>
-                      handleChange(
-                        'qualityScore',
-                        e.target.value ? parseInt(e.target.value) : undefined
-                      )
-                    }
-                    placeholder="75"
-                  />
-                </div>
-              </div>
-
-              {/* Response Content */}
               <div className="space-y-2">
-                <Label htmlFor="responseContent">
-                  Response Content (optional)
+                <Label htmlFor="lastName">
+                  Nom <span className="text-red-500">*</span>
                 </Label>
-                <Textarea
-                  id="responseContent"
-                  value={formData.responseContent}
-                  onChange={(e) =>
-                    handleChange('responseContent', e.target.value)
-                  }
-                  placeholder="Paste the lead's email response here..."
-                  rows={6}
+                <Input
+                  id="lastName"
+                  value={formData.lastName}
+                  onChange={(e) => handleChange('lastName', e.target.value)}
+                  placeholder="Dupont"
+                  className="bg-white/5 border-white/10"
                 />
-                <p className="text-sm text-muted-foreground">
-                  This will be stored as an EMAIL_REPLIED interaction
-                </p>
+                {errors.lastName && (
+                  <p className="text-sm text-red-500">{errors.lastName}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">
+                Email <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+                placeholder="jean.dupont@entreprise.com"
+                className="bg-white/5 border-white/10"
+              />
+              {errors.email && (
+                <p className="text-sm text-red-500">{errors.email}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="company">
+                  Entreprise <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="company"
+                  value={formData.company}
+                  onChange={(e) => handleChange('company', e.target.value)}
+                  placeholder="Acme Corp"
+                  className="bg-white/5 border-white/10"
+                />
+                {errors.company && (
+                  <p className="text-sm text-red-500">{errors.company}</p>
+                )}
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="submit"
-                  disabled={createLead.isPending}
-                  className="flex-1"
-                >
-                  {createLead.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating Lead...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Create Lead
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/admin/leads')}
-                  disabled={createLead.isPending}
-                >
-                  Cancel
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="title">
+                  Poste <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => handleChange('title', e.target.value)}
+                  placeholder="Directeur Marketing"
+                  className="bg-white/5 border-white/10"
+                />
+                {errors.title && (
+                  <p className="text-sm text-red-500">{errors.title}</p>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </form>
-      </div>
-    </DashboardLayout>
+            </div>
+
+            {/* Optional Contact Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Téléphone (optionnel)</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  placeholder="+33 6 12 34 56 78"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="linkedinUrl">URL LinkedIn (optionnel)</Label>
+                <Input
+                  id="linkedinUrl"
+                  value={formData.linkedinUrl}
+                  onChange={(e) => handleChange('linkedinUrl', e.target.value)}
+                  placeholder="https://linkedin.com/in/jeandupont"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+            </div>
+
+            {/* Company Details */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="companySize">Taille (optionnel)</Label>
+                <Select
+                  value={formData.companySize}
+                  onValueChange={(value) => handleChange('companySize', value)}
+                >
+                  <SelectTrigger id="companySize" className="bg-white/5 border-white/10">
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10">
+                    <SelectItem value="1-10">1-10</SelectItem>
+                    <SelectItem value="11-50">11-50</SelectItem>
+                    <SelectItem value="51-200">51-200</SelectItem>
+                    <SelectItem value="201-500">201-500</SelectItem>
+                    <SelectItem value="501-1000">501-1000</SelectItem>
+                    <SelectItem value="1000+">1000+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyIndustry">Secteur (optionnel)</Label>
+                <Input
+                  id="companyIndustry"
+                  value={formData.companyIndustry}
+                  onChange={(e) =>
+                    handleChange('companyIndustry', e.target.value)
+                  }
+                  placeholder="Technologie"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Localisation (optionnel)</Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => handleChange('location', e.target.value)}
+                  placeholder="Paris, France"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+            </div>
+
+            {/* Lead Status & Quality */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="status">Statut du Lead</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) =>
+                    handleChange('status', value as LeadStatus)
+                  }
+                >
+                  <SelectTrigger id="status" className="bg-white/5 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10">
+                    <SelectItem value="CONTACTED">Contacté</SelectItem>
+                    <SelectItem value="OPENED">Ouvert</SelectItem>
+                    <SelectItem value="REPLIED">Répondu</SelectItem>
+                    <SelectItem value="INTERESTED">Intéressé</SelectItem>
+                    <SelectItem value="QUALIFIED">Qualifié</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sentiment">Sentiment</Label>
+                <Select
+                  value={formData.sentiment}
+                  onValueChange={(value) =>
+                    handleChange('sentiment', value as Sentiment)
+                  }
+                >
+                  <SelectTrigger id="sentiment" className="bg-white/5 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10">
+                    <SelectItem value="POSITIVE">Positif</SelectItem>
+                    <SelectItem value="NEUTRAL">Neutre</SelectItem>
+                    <SelectItem value="NEGATIVE">Négatif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="qualityScore">
+                  Score qualité (0-100)
+                </Label>
+                <Input
+                  id="qualityScore"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.qualityScore || ''}
+                  onChange={(e) =>
+                    handleChange(
+                      'qualityScore',
+                      e.target.value ? parseInt(e.target.value) : undefined
+                    )
+                  }
+                  placeholder="75"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+            </div>
+
+            {/* Response Content */}
+            <div className="space-y-2">
+              <Label htmlFor="responseContent">
+                Contenu de la réponse (optionnel)
+              </Label>
+              <Textarea
+                id="responseContent"
+                value={formData.responseContent}
+                onChange={(e) =>
+                  handleChange('responseContent', e.target.value)
+                }
+                placeholder="Collez ici la réponse email du lead..."
+                rows={6}
+                className="bg-white/5 border-white/10"
+              />
+              <p className="text-sm text-muted-foreground">
+                Sera enregistré comme interaction EMAIL_REPLIED
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="submit"
+                disabled={createLead.isPending}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600"
+              >
+                {createLead.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Création en cours...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Créer le Lead
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/admin/leads')}
+                disabled={createLead.isPending}
+                className="border-white/10 hover:bg-white/5"
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </GlassCard>
+      </form>
+    </div>
   );
 }

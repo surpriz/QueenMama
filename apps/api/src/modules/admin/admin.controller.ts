@@ -39,6 +39,35 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
+  @Get('stats/revenue')
+  @ApiOperation({ summary: 'Get revenue statistics by period (weekly/monthly)' })
+  @ApiResponse({ status: 200, description: 'Revenue statistics with chart data' })
+  async getRevenueStats(@Query('period') period?: 'weekly' | 'monthly') {
+    return this.adminService.getRevenueStats(period || 'monthly');
+  }
+
+  @Get('stats/lead-funnel')
+  @ApiOperation({ summary: 'Get lead funnel statistics (conversion rates)' })
+  @ApiResponse({ status: 200, description: 'Lead funnel with conversion rates' })
+  async getLeadFunnelStats() {
+    return this.adminService.getLeadFunnelStats();
+  }
+
+  @Get('stats/campaign-distribution')
+  @ApiOperation({ summary: 'Get campaign status distribution for pie chart' })
+  @ApiResponse({ status: 200, description: 'Campaign distribution by status' })
+  async getCampaignStatusDistribution() {
+    return this.adminService.getCampaignStatusDistribution();
+  }
+
+  @Get('activity')
+  @ApiOperation({ summary: 'Get recent platform activity' })
+  @ApiResponse({ status: 200, description: 'Recent activities (campaigns, leads, payments)' })
+  async getRecentActivity(@Query('limit') limit?: string) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    return this.adminService.getRecentActivity(parsedLimit);
+  }
+
   @Get('ses-metrics')
   @ApiOperation({ summary: 'Get AWS SES email monitoring metrics' })
   @ApiResponse({ status: 200, description: 'SES monitoring metrics including send volume, deliverability, quotas, and identities' })

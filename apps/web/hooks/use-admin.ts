@@ -267,3 +267,42 @@ export function useSesMetrics() {
     refetchInterval: 60 * 1000, // Refresh every minute
   });
 }
+
+// ============= ADVANCED STATISTICS =============
+
+// Get revenue statistics by period
+export function useRevenueStats(period: 'weekly' | 'monthly' = 'monthly') {
+  return useQuery({
+    queryKey: ['admin', 'stats', 'revenue', period],
+    queryFn: () => adminApi.getRevenueStats(period),
+    staleTime: STALE_TIME.STATS,
+  });
+}
+
+// Get lead funnel statistics
+export function useLeadFunnelStats() {
+  return useQuery({
+    queryKey: ['admin', 'stats', 'lead-funnel'],
+    queryFn: () => adminApi.getLeadFunnelStats(),
+    staleTime: STALE_TIME.STATS,
+  });
+}
+
+// Get campaign status distribution
+export function useCampaignDistribution() {
+  return useQuery({
+    queryKey: ['admin', 'stats', 'campaign-distribution'],
+    queryFn: () => adminApi.getCampaignDistribution(),
+    staleTime: STALE_TIME.STATS,
+  });
+}
+
+// Get recent activity feed
+export function useRecentActivity(limit: number = 10) {
+  return useQuery({
+    queryKey: ['admin', 'activity', limit],
+    queryFn: () => adminApi.getRecentActivity(limit),
+    staleTime: STALE_TIME.STATS,
+    refetchInterval: 30 * 1000, // Refresh every 30 seconds
+  });
+}

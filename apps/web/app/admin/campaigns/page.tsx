@@ -1,7 +1,6 @@
 'use client';
 
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GlassCard } from '@/components/landing/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,41 +18,28 @@ import {
   useRejectCampaign,
 } from '@/hooks/use-admin';
 import { AdminCampaign } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 const getStatusBadge = (status: string) => {
-  const variants: Record<string, { className: string }> = {
-    DRAFT: { className: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-    PENDING_REVIEW: { className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
-    WARMUP: { className: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
-    ACTIVE: { className: 'bg-green-100 text-green-700 hover:bg-green-200' },
-    PAUSED: { className: 'bg-orange-100 text-orange-700 hover:bg-orange-200' },
-    COMPLETED: { className: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
-    CANCELED: { className: 'bg-red-100 text-red-700 hover:bg-red-200' },
+  const variants: Record<string, { className: string; label: string }> = {
+    DRAFT: { className: 'bg-gray-500/20 text-gray-400 border border-gray-500/30', label: 'Brouillon' },
+    PENDING_REVIEW: { className: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30', label: 'En attente' },
+    WARMUP: { className: 'bg-blue-500/20 text-blue-400 border border-blue-500/30', label: 'Warmup' },
+    ACTIVE: { className: 'bg-green-500/20 text-green-400 border border-green-500/30', label: 'Active' },
+    PAUSED: { className: 'bg-orange-500/20 text-orange-400 border border-orange-500/30', label: 'En pause' },
+    COMPLETED: { className: 'bg-purple-500/20 text-purple-400 border border-purple-500/30', label: 'Terminée' },
+    CANCELED: { className: 'bg-red-500/20 text-red-400 border border-red-500/30', label: 'Annulée' },
   };
   return variants[status] || variants.DRAFT;
 };
 
 export default function AdminCampaignsPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const { data: campaigns, isLoading } = useAdminCampaigns();
   const approveCampaign = useApproveCampaign();
   const rejectCampaign = useRejectCampaign();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-
-  // Redirect if not admin
-  useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
-
-  if (!user || user.role !== 'ADMIN') {
-    return null;
-  }
 
   const handleApproveCampaign = async (id: string) => {
     if (confirm('Approve this campaign? It will become ACTIVE and start running.')) {
@@ -90,14 +76,15 @@ export default function AdminCampaignsPage() {
   }, {} as Record<string, number>) || {};
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Campaign Management</h1>
-          <p className="text-muted-foreground">
-            Review and manage all campaigns from all customers
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
+          Gestion des Campagnes
+        </h1>
+        <p className="text-muted-foreground">
+          Examiner et gérer toutes les campagnes clients
+        </p>
+      </div>
 
         {/* Status Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2">
@@ -145,12 +132,8 @@ export default function AdminCampaignsPage() {
           </Button>
         </div>
 
-        {/* Campaigns Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>All Campaigns</CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Campaigns Table */}
+      <GlassCard className="p-6">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -278,9 +261,7 @@ export default function AdminCampaignsPage() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </DashboardLayout>
+      </GlassCard>
+    </div>
   );
 }
