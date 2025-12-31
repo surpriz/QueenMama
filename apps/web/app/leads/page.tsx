@@ -20,9 +20,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Eye, Mail, Loader2, Users, Lock, CheckCircle, Sparkles } from 'lucide-react';
+import { Eye, Mail, Loader2, Users, Lock, CheckCircle, Sparkles, CreditCard, Zap } from 'lucide-react';
 import { useLeads, useUnlockLead } from '@/hooks/use-leads';
-import { Lead, LeadStatus } from '@/lib/api';
+import { useCreateRecharge } from '@/hooks/use-payments';
+import { RechargeModal } from '@/components/payments/RechargeModal';
+import { Lead, LeadStatus, LeadUnlockRequiresPayment, RechargeOption } from '@/lib/api';
 import { useState } from 'react';
 
 const getStatusBadge = (status: LeadStatus) => {
@@ -41,10 +43,16 @@ const getStatusBadge = (status: LeadStatus) => {
 };
 
 export default function LeadsPage() {
-  const { data: leads, isLoading } = useLeads();
+  const { data: leads, isLoading, refetch } = useLeads();
   const unlockLead = useUnlockLead();
+  const createRecharge = useCreateRecharge();
+
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+  // Recharge modal state
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargeData, setRechargeData] = useState<LeadUnlockRequiresPayment | null>(null);
 
   const handleUnlockClick = (lead: Lead) => {
     setSelectedLead(lead);
@@ -56,19 +64,53 @@ export default function LeadsPage() {
 
     try {
       const result = await unlockLead.mutateAsync(selectedLead.id);
-      alert(
-        `Lead unlocked successfully! You paid €${result.amountPaid}. Contact: ${result.lead.email}`
-      );
-      setShowUnlockModal(false);
-      setSelectedLead(null);
+
+      // Check if payment is required (no credits)
+      if (result.requiresPayment) {
+        setShowUnlockModal(false);
+        setRechargeData(result as LeadUnlockRequiresPayment);
+        setShowRechargeModal(true);
+      } else {
+        // Lead unlocked successfully with credits
+        alert(
+          `Lead debloque avec succes! Reste ${result.remainingCredits} credits. Contact: ${result.lead.email}`
+        );
+        setShowUnlockModal(false);
+        setSelectedLead(null);
+        refetch(); // Refresh leads list
+      }
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to unlock lead');
+      alert(error.response?.data?.message || 'Erreur lors du deblocage');
     }
   };
 
-  // Calculate unlock price based on lead status (simplified MVP logic)
+  const handleRecharge = async (leadCount: 5 | 10, pendingLeadId?: string) => {
+    if (!rechargeData) return;
+
+    try {
+      await createRecharge.mutateAsync({
+        campaignId: rechargeData.campaignId,
+        data: {
+          leadCount,
+          pendingLeadId,
+        },
+      });
+      // User will be redirected to Stripe Checkout
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Erreur lors de la recharge');
+    }
+  };
+
+  const handleCloseRechargeModal = () => {
+    setShowRechargeModal(false);
+    setRechargeData(null);
+    setSelectedLead(null);
+  };
+
+  // Get price from campaign (will be replaced by actual campaign data)
   const getUnlockPrice = (lead: Lead) => {
-    return 30; // Fixed price for MVP
+    // @ts-ignore - campaign might have pricePerLead
+    return lead.campaign?.pricePerLead || 30;
   };
 
   return (
@@ -311,6 +353,19 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Recharge Modal */}
+      {rechargeData && (
+        <RechargeModal
+          isOpen={showRechargeModal}
+          onClose={handleCloseRechargeModal}
+          onRecharge={handleRecharge}
+          options={rechargeData.rechargeOptions}
+          pricePerLead={rechargeData.pricePerLead}
+          pendingLeadId={rechargeData.leadId}
+          campaignName={(selectedLead as any)?.campaign?.name}
+        />
+      )}
     </DashboardLayout>
   );
 }

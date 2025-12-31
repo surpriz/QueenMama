@@ -17,7 +17,10 @@ async function bootstrap() {
   const corsOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
   logger.log(`CORS Origin configured: ${corsOrigin}`);
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // Enable rawBody for Stripe webhook signature verification
+    rawBody: true,
+  });
 
   // Cookie parser for httpOnly cookies
   app.use(cookieParser());

@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { PrismaModule } from './common/services/prisma.module';
 import { HealthModule } from './health/health.module';
 
@@ -28,6 +29,7 @@ import { HealthModule } from './health/health.module';
     CampaignsModule,
     AdminModule,
     LeadsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

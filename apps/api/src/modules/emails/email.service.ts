@@ -6,6 +6,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { getVerificationEmailTemplate } from './templates/verification';
 import { getPasswordResetEmailTemplate } from './templates/password-reset';
 import { getCampaignNotificationTemplate } from './templates/campaign-notification';
+import { getDepositRequestTemplate } from './templates/deposit-request';
 
 @Injectable()
 export class EmailService {
@@ -227,5 +228,60 @@ export class EmailService {
     this.logger.log(
       `Campaign notifications completed: ${successCount}/${admins.length} successful`,
     );
+  }
+
+  /**
+   * Send deposit request email to customer when admin sets pricing
+   */
+  async sendDepositRequestEmail(
+    email: string,
+    firstName: string,
+    campaignName: string,
+    pricePerLead: number,
+    depositAmount: number,
+    checkoutUrl: string,
+  ): Promise<boolean> {
+    const { subject, html, text } = getDepositRequestTemplate(
+      firstName || 'Client',
+      campaignName,
+      pricePerLead,
+      depositAmount,
+      checkoutUrl,
+    );
+
+    try {
+      const command = new SendEmailCommand({
+        Source: this.fromEmail,
+        Destination: {
+          ToAddresses: [email],
+        },
+        Message: {
+          Subject: {
+            Charset: 'UTF-8',
+            Data: subject,
+          },
+          Body: {
+            Html: {
+              Charset: 'UTF-8',
+              Data: html,
+            },
+            Text: {
+              Charset: 'UTF-8',
+              Data: text,
+            },
+          },
+        },
+      });
+
+      const response = await this.sesClient.send(command);
+      this.logger.log(`Deposit request email sent to ${email} from ${this.fromEmail}`);
+      this.logger.log(`  - SES MessageId: ${response.MessageId}`);
+      this.logger.log(`  - Campaign: ${campaignName}`);
+      this.logger.log(`  - Deposit amount: ${depositAmount} EUR`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send deposit request email to ${email}`, error);
+      throw error;
+    }
   }
 }
