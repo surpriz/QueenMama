@@ -36,6 +36,13 @@ api.interceptors.response.use(
 
 // ========== Types ==========
 
+export enum DepositStatus {
+  PENDING = 'PENDING',
+  CHECKOUT_CREATED = 'CHECKOUT_CREATED',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+}
+
 export interface Campaign {
   id: string;
   customerId: string;
@@ -52,6 +59,11 @@ export interface Campaign {
   budget: number;
   pricePerLead: number;
   maxLeads?: number;
+  // Deposit & Credits
+  depositStatus: DepositStatus;
+  depositPaidAt?: string;
+  creditBalance: number;
+  // Stats
   totalContacted: number;
   totalReplies: number;
   totalQualified: number;
@@ -507,6 +519,32 @@ export interface CreateLeadDto {
 
 export interface UpdateLeadDto extends Partial<CreateLeadDto> {}
 
+// Lead unlock response types
+export interface RechargeOption {
+  leads: number;
+  total: number;
+  label: string;
+}
+
+export interface LeadUnlockSuccess {
+  requiresPayment: false;
+  message: string;
+  lead: Lead;
+  amountPaid: number;
+  remainingCredits: number;
+}
+
+export interface LeadUnlockRequiresPayment {
+  requiresPayment: true;
+  message: string;
+  leadId: string;
+  campaignId: string;
+  pricePerLead: number;
+  rechargeOptions: RechargeOption[];
+}
+
+export type LeadUnlockResponse = LeadUnlockSuccess | LeadUnlockRequiresPayment;
+
 export const leadsApi = {
   getAll: () => api.get<{ data: Lead[]; meta: any }>('/leads').then((res) => res.data.data),
 
@@ -514,5 +552,29 @@ export const leadsApi = {
     api.get<Lead>(`/leads/${id}`).then((res) => res.data),
 
   unlock: (id: string) =>
-    api.post<{ message: string; lead: Lead; amountPaid: number }>(`/leads/${id}/unlock`).then((res) => res.data),
+    api.post<LeadUnlockResponse>(`/leads/${id}/unlock`).then((res) => res.data),
+};
+
+// ========== Payments API ==========
+
+export interface CampaignCredits {
+  balance: number;
+  used: number;
+  depositStatus: DepositStatus;
+  pricePerLead: number;
+}
+
+export interface CreateRechargeDto {
+  leadCount: 5 | 10;
+  pendingLeadId?: string;
+}
+
+export const paymentsApi = {
+  // Get campaign credits balance
+  getCampaignCredits: (campaignId: string) =>
+    api.get<CampaignCredits>(`/payments/campaigns/${campaignId}/credits`).then((res) => res.data),
+
+  // Create recharge checkout
+  createRecharge: (campaignId: string, data: CreateRechargeDto) =>
+    api.post<{ checkoutUrl: string }>(`/payments/campaigns/${campaignId}/recharge`, data).then((res) => res.data),
 };

@@ -73,6 +73,14 @@ enum MarketDifficulty {
   VERY_HARD   // Marché très niché
 }
 
+// Enum DepositStatus pour le suivi des dépôts de campagne
+enum DepositStatus {
+  PENDING           // En attente de dépôt
+  CHECKOUT_CREATED  // Lien de paiement Stripe créé
+  PAID              // Dépôt payé, campagne peut être activée
+  FAILED            // Paiement échoué ou expiré
+}
+
 // ============= CAMPAIGNS =============
 
 model Campaign {
@@ -99,6 +107,12 @@ model Campaign {
   priceApprovedAt   DateTime?         // Date de validation du prix
   priceApprovedBy   String?           // ID de l'admin qui a validé
 
+  // Système de dépôt et crédits (Stripe)
+  depositStatus     DepositStatus @default(PENDING)
+  depositPaidAt     DateTime?
+  depositCheckoutId String?       // Stripe Checkout Session ID
+  creditBalance     Int           @default(0)  // Crédits disponibles pour cette campagne
+
   // Email Sequence
   emailSequences  EmailSequence[]
 
@@ -109,6 +123,7 @@ model Campaign {
   totalPaid       Int @default(0)
 
   leads           Lead[]
+  payments        Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -117,6 +132,7 @@ model Campaign {
 
   @@index([customerId])
   @@index([status])
+  @@index([depositStatus])
 }
 
 enum CampaignStatus {
@@ -185,6 +201,9 @@ model Lead {
   paymentId       String?
   payment         Payment? @relation(fields: [paymentId], references: [id])
 
+  // Pending unlock (pour auto-déblocage après recharge)
+  pendingUnlock   PendingLeadUnlock?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -244,13 +263,18 @@ model Payment {
   customerId      String
   customer        Customer @relation(fields: [customerId], references: [id])
 
+  // Relation campagne (pour dépôts et recharges)
+  campaignId      String?
+  campaign        Campaign? @relation(fields: [campaignId], references: [id])
+
   type            PaymentType
   amount          Float
   currency        String @default("EUR")
 
   // Stripe
-  stripePaymentIntentId String? @unique
-  stripeInvoiceId       String?
+  stripePaymentIntentId   String? @unique
+  stripeInvoiceId         String?
+  stripeCheckoutSessionId String? @unique  // Pour Checkout Sessions
 
   status          PaymentStatus @default(PENDING)
 
@@ -262,12 +286,15 @@ model Payment {
   updatedAt DateTime @updatedAt
 
   @@index([customerId])
+  @@index([campaignId])
   @@index([status])
+  @@index([stripeCheckoutSessionId])
 }
 
 enum PaymentType {
-  LEAD_UNLOCK   // One-time lead unlock
-  CREDITS       // Bulk credits purchase (pour futur usage)
+  LEAD_UNLOCK       // Déblocage d'un lead (consommation de crédit)
+  DEPOSIT           // Dépôt initial de garantie (2 leads)
+  CREDIT_RECHARGE   // Recharge de crédits (5 ou 10 leads)
 }
 
 enum PaymentStatus {
@@ -276,6 +303,25 @@ enum PaymentStatus {
   FAILED
   REFUNDED
   CANCELED
+}
+
+// ============= PENDING LEAD UNLOCKS =============
+
+// Suivi des leads en attente de déblocage après recharge
+model PendingLeadUnlock {
+  id                      String   @id @default(cuid())
+  leadId                  String   @unique
+  lead                    Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customerId              String
+  campaignId              String
+  stripeCheckoutSessionId String
+  expiresAt               DateTime // 24h après création
+
+  createdAt DateTime @default(now())
+
+  @@index([stripeCheckoutSessionId])
+  @@index([customerId])
+  @@index([expiresAt])
 }
 
 // ============= JOBS & SYSTEM =============

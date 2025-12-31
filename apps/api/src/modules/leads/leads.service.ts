@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { LeadStatus } from '@prisma/client';
+import { LeadStatus, DepositStatus, PaymentStatus, PaymentType } from '@prisma/client';
 import { PrismaService } from '../../common/services/prisma.service';
 import {
   PaginationDto,
@@ -105,10 +105,10 @@ export class LeadsService {
   }
 
   /**
-   * Unlock lead (payment + reveal)
+   * Unlock lead using credits or return recharge options
    */
   async unlockLead(id: string, customerId: string) {
-    // Get lead with campaign info
+    // Get lead with campaign info including credit balance
     const lead = await this.prisma.lead.findUnique({
       where: { id },
       include: {
@@ -118,6 +118,8 @@ export class LeadsService {
             name: true,
             pricePerLead: true,
             customerId: true,
+            depositStatus: true,
+            creditBalance: true,
           },
         },
       },
@@ -151,20 +153,68 @@ export class LeadsService {
       );
     }
 
-    const unlockPrice = lead.campaign.pricePerLead;
+    // Check if deposit is paid
+    if (lead.campaign.depositStatus !== DepositStatus.PAID) {
+      throw new BadRequestException(
+        'Campaign deposit not paid. Please complete the deposit payment first.',
+      );
+    }
 
-    // For MVP: Simplified payment (no Stripe)
-    // In production: Create Stripe payment intent here
+    const pricePerLead = lead.campaign.pricePerLead;
 
-    // Update lead and campaign in transaction
+    // Check if customer has credits
+    if (lead.campaign.creditBalance <= 0) {
+      // No credits - return recharge options
+      return {
+        requiresPayment: true,
+        message: 'Insufficient credits. Please recharge to unlock this lead.',
+        leadId: id,
+        campaignId: lead.campaignId,
+        pricePerLead,
+        rechargeOptions: [
+          {
+            leads: 5,
+            total: pricePerLead * 5,
+            label: '5 leads',
+          },
+          {
+            leads: 10,
+            total: pricePerLead * 10,
+            label: '10 leads',
+          },
+        ],
+      };
+    }
+
+    // Has credits - unlock immediately
+    return this.unlockLeadWithCredit(lead, customerId, pricePerLead);
+  }
+
+  /**
+   * Internal method to unlock a lead using campaign credits
+   */
+  private async unlockLeadWithCredit(
+    lead: any,
+    customerId: string,
+    pricePerLead: number,
+  ) {
     const updatedLead = await this.prisma.$transaction(async (tx) => {
+      // Decrement credit balance
+      await tx.campaign.update({
+        where: { id: lead.campaignId },
+        data: {
+          creditBalance: { decrement: 1 },
+          totalPaid: { increment: 1 },
+        },
+      });
+
       // Reveal lead
       const revealedLead = await tx.lead.update({
-        where: { id },
+        where: { id: lead.id },
         data: {
           isRevealed: true,
           revealedAt: new Date(),
-          paidAmount: unlockPrice,
+          paidAmount: pricePerLead,
           status: LeadStatus.PAID,
         },
         include: {
@@ -172,6 +222,7 @@ export class LeadsService {
             select: {
               id: true,
               name: true,
+              creditBalance: true,
             },
           },
           interactions: {
@@ -180,25 +231,19 @@ export class LeadsService {
         },
       });
 
-      // Update campaign totalPaid counter
-      await tx.campaign.update({
-        where: { id: lead.campaignId },
-        data: {
-          totalPaid: { increment: 1 },
-        },
-      });
-
-      // Create payment record (simplified for MVP)
+      // Create payment record for tracking
       await tx.payment.create({
         data: {
           customerId,
-          type: 'LEAD_UNLOCK',
-          amount: unlockPrice,
+          campaignId: lead.campaignId,
+          type: PaymentType.LEAD_UNLOCK,
+          amount: pricePerLead,
           currency: 'EUR',
-          status: 'SUCCEEDED',
+          status: PaymentStatus.SUCCEEDED,
           metadata: {
-            leadId: id,
+            leadId: lead.id,
             campaignId: lead.campaignId,
+            paidWithCredits: true,
           },
         },
       });
@@ -207,9 +252,11 @@ export class LeadsService {
     });
 
     return {
+      requiresPayment: false,
       message: 'Lead unlocked successfully',
       lead: updatedLead,
-      amountPaid: unlockPrice,
+      amountPaid: pricePerLead,
+      remainingCredits: updatedLead.campaign.creditBalance,
     };
   }
 

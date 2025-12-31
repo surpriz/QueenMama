@@ -3,9 +3,12 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { UserRole, AccountStatus, CampaignStatus, LeadStatus, InteractionType, MarketDifficulty } from '@prisma/client';
 import { PrismaService } from '../../common/services/prisma.service';
+import { PaymentsService } from '../payments/payments.service';
+import { EmailService } from '../emails/email.service';
 import { UpdateCampaignDto } from '../campaigns/dto/update-campaign.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
 import { UpdateLeadDto } from '../leads/dto/update-lead.dto';
@@ -22,7 +25,13 @@ import {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AdminService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentsService: PaymentsService,
+    private readonly emailService: EmailService,
+  ) {}
   // Get admin statistics
   async getStats() {
     const [totalUsers, activeUsers, blockedUsers, admins] = await Promise.all([
@@ -587,13 +596,41 @@ export class AdminService {
       },
     });
 
-    // TODO: Send notification to customer about approved pricing
+    // Create deposit checkout session and send email to customer
+    const depositAmount = dto.pricePerLead * 2;
+    let checkoutUrl: string | null = null;
+
+    try {
+      const deposit = await this.paymentsService.createDepositPayment(id);
+      checkoutUrl = deposit.checkoutUrl;
+
+      // Send deposit request email
+      await this.emailService.sendDepositRequestEmail(
+        updatedCampaign.customer.email,
+        updatedCampaign.customer.firstName || 'Client',
+        updatedCampaign.name,
+        dto.pricePerLead,
+        depositAmount,
+        checkoutUrl,
+      );
+
+      this.logger.log(
+        `Deposit email sent to ${updatedCampaign.customer.email} for campaign ${id}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create deposit or send email for campaign ${id}`,
+        error,
+      );
+      // Don't throw - pricing is already saved, deposit can be retried
+    }
 
     return {
       message: 'Campaign pricing updated successfully',
       campaign: updatedCampaign,
       analysis,
       warning: priceValidation.warning,
+      checkoutUrl,
     };
   }
 
