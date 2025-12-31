@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { UserRole, AccountStatus, Campaign, Customer } from '@prisma/client';
+import { PrismaService } from '../../common/services/prisma.service';
 import { getVerificationEmailTemplate } from './templates/verification';
 import { getPasswordResetEmailTemplate } from './templates/password-reset';
+import { getCampaignNotificationTemplate } from './templates/campaign-notification';
 
 @Injectable()
 export class EmailService {
@@ -11,7 +14,10 @@ export class EmailService {
   private fromEmail: string;
   private frontendUrl: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private prisma: PrismaService,
+  ) {
     const region = this.configService.get('AWS_REGION') || 'eu-west-3';
     const accessKeyId = this.configService.get('AWS_ACCESS_KEY_ID') || '';
 
@@ -121,5 +127,105 @@ export class EmailService {
       this.logger.error(`Failed to send password reset email to ${email}`, error);
       throw error;
     }
+  }
+
+  async sendCampaignNotificationToAdmins(
+    campaign: Campaign & { customer: Customer },
+  ): Promise<void> {
+    // 1. Query all active admins
+    const admins = await this.prisma.customer.findMany({
+      where: {
+        role: UserRole.ADMIN,
+        status: AccountStatus.ACTIVE,
+      },
+      select: {
+        email: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+
+    // 2. Handle no admins edge case
+    if (admins.length === 0) {
+      this.logger.warn('No active admins found to notify about new campaign');
+      return;
+    }
+
+    this.logger.log(
+      `Sending campaign notification to ${admins.length} admin(s) for campaign: ${campaign.name}`,
+    );
+
+    // 3. Build admin dashboard URL
+    const adminDashboardUrl = `${this.frontendUrl}/admin/campaigns/${campaign.id}`;
+
+    // 4. Prepare customer display name
+    const customerName =
+      campaign.customer.firstName && campaign.customer.lastName
+        ? `${campaign.customer.firstName} ${campaign.customer.lastName}`
+        : campaign.customer.email;
+
+    // 5. Send emails in parallel using Promise.allSettled
+    const sendPromises = admins.map(async (admin) => {
+      const adminFirstName = admin.firstName || 'Admin';
+
+      const { subject, html, text } = getCampaignNotificationTemplate(
+        adminFirstName,
+        customerName,
+        campaign.name,
+        campaign.description,
+        campaign.targetCriteria,
+        campaign.budget,
+        campaign.maxLeads,
+        campaign.id,
+        adminDashboardUrl,
+      );
+
+      try {
+        const command = new SendEmailCommand({
+          Source: this.fromEmail,
+          Destination: {
+            ToAddresses: [admin.email],
+          },
+          Message: {
+            Subject: {
+              Charset: 'UTF-8',
+              Data: subject,
+            },
+            Body: {
+              Html: {
+                Charset: 'UTF-8',
+                Data: html,
+              },
+              Text: {
+                Charset: 'UTF-8',
+                Data: text,
+              },
+            },
+          },
+        });
+
+        const response = await this.sesClient.send(command);
+        this.logger.log(
+          `Campaign notification sent to admin ${admin.email} (MessageId: ${response.MessageId})`,
+        );
+        return { success: true, email: admin.email };
+      } catch (error) {
+        this.logger.error(
+          `Failed to send campaign notification to admin ${admin.email}`,
+          error,
+        );
+        return { success: false, email: admin.email, error };
+      }
+    });
+
+    // 6. Wait for all emails and log summary
+    const results = await Promise.allSettled(sendPromises);
+    const successCount = results.filter(
+      (r) => r.status === 'fulfilled' && r.value.success,
+    ).length;
+
+    this.logger.log(
+      `Campaign notifications completed: ${successCount}/${admins.length} successful`,
+    );
   }
 }

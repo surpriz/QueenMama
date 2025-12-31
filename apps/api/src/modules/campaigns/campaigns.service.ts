@@ -2,11 +2,13 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { CampaignStatus, LeadStatus } from '@prisma/client';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { PrismaService } from '../../common/services/prisma.service';
+import { EmailService } from '../emails/email.service';
 import {
   PaginationDto,
   PaginatedResult,
@@ -15,7 +17,12 @@ import {
 
 @Injectable()
 export class CampaignsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(CampaignsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async create(customerId: string, createCampaignDto: CreateCampaignDto) {
     // Verify customer exists
@@ -45,6 +52,28 @@ export class CampaignsService {
         emailSequences: true,
       },
     });
+
+    // Send notifications to admins (non-blocking)
+    try {
+      // Fetch campaign with customer relation for email notification
+      const campaignWithCustomer = await this.prisma.campaign.findUnique({
+        where: { id: campaign.id },
+        include: { customer: true },
+      });
+
+      if (campaignWithCustomer) {
+        // Send notification emails (doesn't throw, handles errors internally)
+        await this.emailService.sendCampaignNotificationToAdmins(
+          campaignWithCustomer,
+        );
+      }
+    } catch (error) {
+      // Log error but don't fail campaign creation
+      this.logger.error(
+        `Failed to send admin notifications for campaign ${campaign.id}`,
+        error,
+      );
+    }
 
     return campaign;
   }
